@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { Transport } from "@nestjs/microservices";
 import { readFile } from 'fs/promises';
 import * as path from 'path';
-
+import { NestFactory } from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 @Injectable()
 export class UtilsService { 
     
@@ -35,4 +35,20 @@ private static getServiceClient(service: string, port?: number): { name, transpo
         }
     }
 }
+
+static async bootstrapMicroservice(appModule) {
+    const app = await NestFactory.createMicroservice<MicroserviceOptions>(
+      appModule,
+      {
+        transport: Transport.TCP,
+        options:{
+          host: process.env["DOMAIN_NAME"]
+            && `${process.env["CURRENT_BRANCH_SUBENDPOINT"]}.${await UtilsService.projectName()}.${process.env["DOMAIN_NAME"]}` 
+            ||"localhost",
+          port:await UtilsService.port()
+        }
+      },
+    );
+    await app.listen();
+  }
 }

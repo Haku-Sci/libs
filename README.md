@@ -6,3 +6,4 @@ It allows to fetch:
 * The name of the current microservice
 * The list of services for configuration (Based on the environment variable "SERVICES"), and their port
 * The port of the current microservice (Based on the environment variable "SERVICES" and this service's name)
+* default bootstrap for microservices
