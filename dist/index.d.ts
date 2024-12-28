@@ -1,2 +1,2 @@
-export * from './utils.module';
-export * from './utils.service';
+export * from './microservice/microservice.module';
+export * from './microservice/microservice.service';

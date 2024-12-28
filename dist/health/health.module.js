@@ -5,13 +5,21 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var HealthModule_1;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UtilsModule = void 0;
+exports.HealthModule = void 0;
 const common_1 = require("@nestjs/common");
-let UtilsModule = class UtilsModule {
+const health_controller_1 = require("./health.controller");
+let HealthModule = HealthModule_1 = class HealthModule {
+    static forRoot() {
+        return {
+            module: HealthModule_1,
+            controllers: [health_controller_1.HealthController],
+        };
+    }
 };
-exports.UtilsModule = UtilsModule;
-exports.UtilsModule = UtilsModule = __decorate([
+exports.HealthModule = HealthModule;
+exports.HealthModule = HealthModule = HealthModule_1 = __decorate([
     (0, common_1.Module)({})
-], UtilsModule);
-//# sourceMappingURL=utils.module.js.map
+], HealthModule);
+//# sourceMappingURL=health.module.js.map

@@ -1,8 +1,7 @@
-export declare class UtilsService {
-    private static listServices;
+import { INestMicroservice } from '@nestjs/common';
+export declare class MicroserviceLibModule {
     static projectName(): Promise<string>;
-    static port(): Promise<number>;
-    static microservicesClients(): any[];
-    private static getServiceClient;
-    static bootstrapMicroservice(appModule: any): Promise<void>;
+    private static registerService;
+    private static register;
+    static bootstrapMicroservice(appModule: any, customControllers?: any): Promise<INestMicroservice>;
 }

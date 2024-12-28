@@ -8,10 +8,15 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UtilsModule = void 0;
 const common_1 = require("@nestjs/common");
+const microservice_service_1 = require("./microservice.service");
+const core_1 = require("@nestjs/core");
 let UtilsModule = class UtilsModule {
 };
 exports.UtilsModule = UtilsModule;
 exports.UtilsModule = UtilsModule = __decorate([
-    (0, common_1.Module)({})
+    (0, common_1.Module)({
+        providers: [microservice_service_1.Microservice],
+        exports: [microservice_service_1.Microservice, core_1.ModuleRef],
+    })
 ], UtilsModule);
-//# sourceMappingURL=utils.module.js.map
+//# sourceMappingURL=microservice.module.js.map
