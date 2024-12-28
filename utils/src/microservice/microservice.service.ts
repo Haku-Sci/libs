@@ -8,7 +8,7 @@ import axios from 'axios';
 import { lastValueFrom } from 'rxjs';
 
 @Injectable()
-export class Microservice { 
+export class MicroserviceService { 
   static async projectName(): Promise<string> {
     var data = await readFile(
         path.join(
@@ -40,7 +40,7 @@ export class Microservice {
   static async sendTCPMessage(service, messagePattern, payload?):Promise<any>{
     const client: ClientProxy = ClientProxyFactory.create({
       transport: Transport.TCP,
-      options: await Microservice.getServiceURI(service),
+      options: await MicroserviceService.getServiceURI(service),
     });
     try {
       const result = await lastValueFrom(await client.send(messagePattern, payload));

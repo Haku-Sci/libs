@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { Microservice} from './microservice.service';
+import { MicroserviceService } from './microservice.service';
 import { ModuleRef } from '@nestjs/core';
 
 @Module({
-  providers: [Microservice],
-  exports: [Microservice,ModuleRef],
+  providers: [MicroserviceService],
+  exports: [MicroserviceService,ModuleRef],
 })
-export class UtilsModule { }
+export class MicroserviceModule { }
