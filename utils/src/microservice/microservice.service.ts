@@ -72,10 +72,20 @@ export class MicroserviceService {
   }
 
   static async bootstrapMicroservice(appModule):Promise<INestMicroservice> {
+    // Create a new TCP serveur to get an availanble port
+    const server = net.createServer();
+    server.listen(0); 
+    await new Promise((resolve) => server.once('listening', resolve));
+    const address = server.address() as net.AddressInfo;
+
+    //Generate Microservice
     const app = await NestFactory.createMicroservice<MicroserviceOptions>(
       appModule,
       {
         transport: Transport.TCP,
+        options:{
+          port:address.port
+        }
       },
     );
     await app.listen();
