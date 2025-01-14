@@ -6,6 +6,7 @@ import { ClientProxy, ClientProxyFactory, MicroserviceOptions, NestMicroservice,
 import * as net from 'net';
 import axios from 'axios';
 import { lastValueFrom } from 'rxjs';
+import { Client } from "pg"; // Make sure the 'pg' package is installed
 
 const HAKU_SCI_EXCHANGE = 'Haku-SciExchange';
 
@@ -77,15 +78,15 @@ export class MicroserviceService {
     }
   }
 
-  private static async registerService(address: net.AddressInfo) {
+  private static async registerService() {
     const projectName = await this.projectName();
     const serviceData = {
       ID: projectName,
       Name: projectName,
-      Address: address.address,
-      Port: address.port,
+      Address: this.serviceAddress.address,
+      Port: this.serviceAddress.port,
       Check: {
-        TCP: `${address.address}:${address.port}`,
+        TCP: `${this.serviceAddress.address}:${this.serviceAddress.port}`,
         Interval: "10s",
         Timeout: "5s",
         DeregisterCriticalServiceAfter: "1m"
@@ -93,17 +94,32 @@ export class MicroserviceService {
     };
 
     await axios.put(`${process.env["CONSUL_URL"]}/v1/agent/service/register`, serviceData);
-    console.log(`Service registered with Consul on ${address.address}:${address.port}`);
+    console.log(`Service registered with Consul on ${this.serviceAddress.address}:${this.serviceAddress.port}`);
   }
 
-  static async bootstrapMicroservice(appModule): Promise<INestApplication> {
+  private static async getLocalServerAddress(): Promise<net.AddressInfo> {
     // Create a new TCP serveur to get an available port
     const server = net.createServer();
     server.listen(0);
     await new Promise((resolve) => server.once('listening', resolve));
-    this.serviceAddress = server.address() as net.AddressInfo;
+    const address = server.address() as net.AddressInfo;
+    address.address = "localhost";
+    server.close();
+    return address;
+  }
+  static async bootstrapMicroservice(appModule): Promise<INestApplication> {
+    this.serviceAddress=!process.env["AWS_REGION"]?
+      await this.getLocalServerAddress():
+      {
+        address:`haku-sci-${process.env["AWS_APPLICATION"]}-${process.env["AWS_BRANCH"]}.${process.env["AWS_REGION"]}.elasticbeanstalk.com`,
+        port:3000
+      } as net.AddressInfo 
+      
+    // Initialize the database if needed
+    if (process.env["RDS_DBNAME"])
+      this.createDatabaseIfNotExists()
 
-    //Generate Microservice
+    // Generate Microservice
     const app = await NestFactory.create(appModule)
     app.connectMicroservice<MicroserviceOptions>(
       {
@@ -114,7 +130,7 @@ export class MicroserviceService {
       },
     );
 
-    // 2. Démarrer le transport RabbitMQ
+    // Start rabbitmq
     if (process.env["RABBITMQ_URL"]) {
       app.connectMicroservice<MicroserviceOptions>({
         transport: Transport.RMQ,
@@ -127,12 +143,36 @@ export class MicroserviceService {
         },
       });
     }
+
+    // start services
     await app.startAllMicroservices()
-    await app.listen(this.serviceAddress.port);
-    if (process.env["CONSUL_URL"]) {
-      const tcpServer: net.Server = (app as any).server.server;
-      this.registerService(tcpServer.address() as net.AddressInfo)
-    }
+    await app.listen(0);
+    if (process.env["CONSUL_URL"])
+      this.registerService()
     return app
   }
+
+  private static async createDatabaseIfNotExists() {
+    const client = new Client({
+      host: process.env["RDS_HOSTNAME"],
+      port: process.env["RDS_PORT"],
+      user: process.env["RDS_USERNAME"],
+      password: process.env["RDS_PASSWORD"],
+      database: "postgres", // Connect to the default 'postgres' database
+    });
+
+    try {
+      await client.connect();
+      const result = await client.query(`SELECT 1 FROM pg_database WHERE datname = $1`, [process.env["RDS_DBNAME"]]);
+
+      if (result.rowCount === 0) {
+        console.log(`Database "${process.env["RDS_DBNAME"]}" does not exist. Creating...`);
+        await client.query(`CREATE DATABASE "${process.env["RDS_DBNAME"]}"`);
+        console.log(`Database "${process.env["RDS_DBNAME"]}" created successfully.`);
+      }
+    } finally {
+      await client.end();
+    }
+  }
+
 }

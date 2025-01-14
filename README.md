@@ -25,6 +25,10 @@ the start_docker_services.bat method allows to run all required services from do
 * Postgresql
 * RabbitMQ
 
+## Database
+
+if the service uses a database, and this database doesn't exist in the system, it will be created automatically
+
 ## launch.json
 
 The launch.json file allows to run all services (the project libs must be in the same directory as "services", which contains all services)
