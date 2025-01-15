@@ -41,6 +41,7 @@
               "INIT": "true",
               "DEBUG": "true",
               "CONSUL_URL":"http://localhost:8500",
+              "RABBITMQ_URL":"amqp://localhost:15672",
               "RDS_PORT": "5432",
               "RDS_HOSTNAME": "localhost",
               "RDS_USERNAME": "admin",
@@ -59,6 +60,7 @@
               "INIT": "false",
               "DEBUG": "true",
               "CONSUL_URL":"http://localhost:8500",
+              "RABBITMQ_URL":"amqp://localhost:15672",
               "RDS_HOSTNAME": "localhost",
               "RDS_PORT": "5432",
               "RDS_USERNAME": "admin",
@@ -76,6 +78,7 @@
                 "INIT": "true",
                 "DEBUG": "true",
                 "CONSUL_URL":"http://localhost:8500",
+                "RABBITMQ_URL":"amqp://localhost:15672",
                 "NEO4J_URI":"neo4j://localhost:7687",
                 "NEO4J_USER":"neo4j",
                 "NEO4J_PASSWORD":"password_neo4j"

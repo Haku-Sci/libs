@@ -63,8 +63,8 @@ export class MicroserviceService {
     const client: ClientProxy = ClientProxyFactory.create({
       //transport: Transport.RMQ,
       options: {
-        urls: [`amqp://${process.env["RABBITMQ_URL"]}`],
-        queue: queue, // La queue est créée mais pas nécessaire pour le producteur
+        urls: [`${process.env["RABBITMQ_URL"]}`],
+        queue: queue,
         queueOptions: {
           durable: false,
         },
@@ -135,7 +135,7 @@ export class MicroserviceService {
       app.connectMicroservice<MicroserviceOptions>({
         transport: Transport.RMQ,
         options: {
-          urls: [`amqp://${process.env["RABBITMQ_URL"]}`],
+          urls: [`${process.env["RABBITMQ_URL"]}`],
           queue: await this.projectName(),
           queueOptions: {
             durable: false,
