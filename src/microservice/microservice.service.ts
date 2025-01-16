@@ -1,4 +1,4 @@
-import { INestApplication, Injectable, NotFoundException } from '@nestjs/common';
+import { INestApplication, INestMicroservice, Injectable, NotFoundException } from '@nestjs/common';
 import { readFile } from 'fs/promises';
 import * as path from 'path';
 import { NestFactory } from '@nestjs/core';
@@ -6,7 +6,6 @@ import { ClientProxy, ClientProxyFactory, MicroserviceOptions, NestMicroservice,
 import * as net from 'net';
 import axios from 'axios';
 import { lastValueFrom } from 'rxjs';
-import { Client } from "pg"; // Make sure the 'pg' package is installed
 
 const HAKU_SCI_EXCHANGE = 'Haku-SciExchange';
 
@@ -63,7 +62,7 @@ export class MicroserviceService {
     const client: ClientProxy = ClientProxyFactory.create({
       //transport: Transport.RMQ,
       options: {
-        urls: [`${process.env["RABBITMQ_URL"]}`],
+        urls: [process.env.RABBITMQ_URL],
         queue: queue,
         queueOptions: {
           durable: false,
@@ -103,25 +102,26 @@ export class MicroserviceService {
     server.listen(0);
     await new Promise((resolve) => server.once('listening', resolve));
     const address = server.address() as net.AddressInfo;
-    address.address = "localhost";
     server.close();
     return address;
   }
-  static async bootstrapMicroservice(appModule): Promise<INestApplication> {
-    this.serviceAddress=!process.env["AWS_REGION"]?
+  
+  static async bootstrapMicroservice(appModule): Promise<INestMicroservice> {
+    this.serviceAddress=!process.env.AWS_REGION?
       await this.getLocalServerAddress():
       {
-        address:`haku-sci-${process.env["AWS_APPLICATION"]}-${process.env["AWS_BRANCH"]}.${process.env["AWS_REGION"]}.elasticbeanstalk.com`,
+        address:`haku-sci-${await this.projectName()}-${process.env.BRANCH}.${process.env.AWS_REGION}.elasticbeanstalk.com`,
         port:3000
       } as net.AddressInfo 
       
     // Initialize the database if needed
-    if (process.env["RDS_DBNAME"])
-      this.createDatabaseIfNotExists()
-
+    if (process.env["RDS_DBNAME"]){
+      const postGresService=require ('./postgres.service');
+      postGresService.createDatabaseIfNotExists()
+    }
+      
     // Generate Microservice
-    const app = await NestFactory.create(appModule)
-    app.connectMicroservice<MicroserviceOptions>(
+    const app = await NestFactory.createMicroservice<MicroserviceOptions>(appModule,
       {
         transport: Transport.TCP,
         options: {
@@ -129,50 +129,25 @@ export class MicroserviceService {
         }
       },
     );
-
+    await app.listen();
+    const tcpServer: net.Server = (app as any).server.server;
+    this.serviceAddress=tcpServer.address() as net.AddressInfo
     // Start rabbitmq
-    if (process.env["RABBITMQ_URL"]) {
-      app.connectMicroservice<MicroserviceOptions>({
+    if (process.env.RABBITMQ_URL) {
+      const rabbitMQApp=await NestFactory.createMicroservice<MicroserviceOptions>(appModule, {
         transport: Transport.RMQ,
         options: {
-          urls: [`${process.env["RABBITMQ_URL"]}`],
+          urls: [process.env.RABBITMQ_URL],
           queue: await this.projectName(),
           queueOptions: {
             durable: false,
           },
         },
       });
+      rabbitMQApp.listen()
     }
-
-    // start services
-    await app.startAllMicroservices()
-    await app.listen(0);
     if (process.env["CONSUL_URL"])
       this.registerService()
     return app
   }
-
-  private static async createDatabaseIfNotExists() {
-    const client = new Client({
-      host: process.env["RDS_HOSTNAME"],
-      port: process.env["RDS_PORT"],
-      user: process.env["RDS_USERNAME"],
-      password: process.env["RDS_PASSWORD"],
-      database: "postgres", // Connect to the default 'postgres' database
-    });
-
-    try {
-      await client.connect();
-      const result = await client.query(`SELECT 1 FROM pg_database WHERE datname = $1`, [process.env["RDS_DBNAME"]]);
-
-      if (result.rowCount === 0) {
-        console.log(`Database "${process.env["RDS_DBNAME"]}" does not exist. Creating...`);
-        await client.query(`CREATE DATABASE "${process.env["RDS_DBNAME"]}"`);
-        console.log(`Database "${process.env["RDS_DBNAME"]}" created successfully.`);
-      }
-    } finally {
-      await client.end();
-    }
-  }
-
 }

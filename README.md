@@ -18,16 +18,16 @@ if consul is used, and env variabe CONSUL_URI is defined, then the lib allows as
 
 ## Docker
 
-the start_docker_services.bat method allows to run all required services from docker:
+the start_services.bat method allows to run all required services from docker:
 
 * Consul
 * Neo4j
 * Postgresql
 * RabbitMQ
 
-## Database
+## PostgreSQL
 
-if the service uses a database, and this database doesn't exist in the system, it will be created automatically
+if the service uses a database PostgreSQL, and this database doesn't exist in the system, it will be created automatically (require the librarie pg)
 
 ## launch.json
 

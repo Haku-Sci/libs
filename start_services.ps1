@@ -1,5 +1,5 @@
 #consul
-docker run --name consul-container -d -p 8500:8500 -p 8600:8600/udp -v consul_data:/consul/data -e CONSUL_BIND_INTERFACE=eth0 consul:1.15.4
+Start-Process -FilePath "consul" -ArgumentList "agent -dev"
 #rabbitmq
 docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:management
 #postgresql
