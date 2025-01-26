@@ -1,6 +1,12 @@
 import subprocess
 import os
 import shutil
+import socket
+import time
+
+def is_port_in_use(port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(("localhost", port)) == 0
 
 def check_container_status(container_name):
     """Check if the container exists."""
@@ -58,8 +64,27 @@ def create_and_run_container(service_config):
             *additional_args,
             image,
         ],
-        check=True,
+        check=True
     )
+    if  "postprocess" in service_config:
+        process = subprocess.Popen(
+        ["docker", "logs", "-f", container_name],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        )
+        try:
+            line=""
+            while not line or service_config["postprocess"]["endCreationLog"] not in line :
+                # Lire les lignes des logs au fur et à mesure
+                line = process.stdout.readline()
+                time.sleep(0.1)  
+            subprocess.run(["docker", "exec", container_name, *service_config["postprocess"]["postprocessCommand"]],check=True)
+        except Exception as e:
+            print(f"Error while reading logs: {e}")
+        finally:
+            process.terminate()
+    
     print(f"Container '{container_name}' created and started successfully.")
 
 def manage_docker_service(service_config):
@@ -88,19 +113,17 @@ def manage_consul():
         print("Consul downloaded and extracted successfully.")
 
     # Check if Consul is already running
-    result = subprocess.run(
-        ["tasklist", "/FI", "IMAGENAME eq consul.exe"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    if "consul.exe" in result.stdout:
-        print("Consul is already running.")
+    if is_port_in_use(8500):
+        print("Consul is already running on port 8500.")
     else:
         print("Starting Consul...")
         subprocess.run(
-            ["Start-Process", "-FilePath", consul_path, "-ArgumentList", "agent -dev"],
-            shell=True,
+            [
+                "powershell",
+                "-Command",
+                f"Start-Process -FilePath '{consul_path}' -ArgumentList 'agent -dev'",
+            ],
+            check=True,
         )
         print("Consul started successfully.")
 
@@ -112,6 +135,10 @@ services = [
         "ports": {5672: 5672, 15672: 15672},
         "env": {},
         "additional_args": [],
+        "postprocess": {
+            "endCreationLog":"Server startup complete",
+            "postprocessCommand":["rabbitmqadmin", "declare", "exchange", 'name=Haku-SciExchange', 'type=direct']
+        },
     },
     {
         "name": "postgres",
@@ -120,7 +147,7 @@ services = [
         "env": {
             "POSTGRES_USER": "admin",
             "POSTGRES_PASSWORD": "password",
-            "POSTGRES_DB": "testdb",
+            "POSTGRES_DB": "postgres",
         },
         "additional_args": [],
     },
@@ -129,7 +156,7 @@ services = [
         "image": "neo4j:latest",
         "ports": {7474: 7474, 7687: 7687},
         "env": {
-            "NEO4J_AUTH": "neo4j/testpassword",
+            "NEO4J_AUTH": "neo4j/password",
         },
         "additional_args": [],
     },
