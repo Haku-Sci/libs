@@ -135,10 +135,6 @@ services = [
         "ports": {5672: 5672, 15672: 15672},
         "env": {},
         "additional_args": [],
-        "postprocess": {
-            "endCreationLog":"Server startup complete",
-            "postprocessCommand":["rabbitmqadmin", "declare", "exchange", 'name=Haku-SciExchange', 'type=direct']
-        },
     },
     {
         "name": "postgres",

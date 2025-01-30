@@ -29,11 +29,26 @@ the start_services.bat method allows to run all required services from docker:
 
 if the service uses a database PostgreSQL, and this database doesn't exist in the system, it will be created automatically (require the librarie pg)
 
+## RabbitMQ
+
+Using RabbitMQService, lets implement dispatch of messages with an option to wait that all messages have been processed. A watchdog of 10 seconds raise an error Gateway timeout
+If the option is activated, a queue ack_queue_\<name of the project\> is created  
+
+The decorator HakuSciSubscriber allows to listen for a specific keyword.
+Each microservice which register with this decorator will have automatically a queue created, with its name.
+The exchanger is amq.topic
+
 ## launch.json
 
 The launch.json file allows to run all services (the project libs must be in the same directory as "services", which contains all services)
 
-## other
+## utils
 
-Finally, the method executeFunction into the utils library lets call dynamically the function of an object, with parameters
+### executeFunction
+
+lets call dynamically the function of an object, with parameters
 (Format: object as class, function name as string, parameters as dictionary)
+
+### withWatchdog
+
+Add a watchdog to a promise

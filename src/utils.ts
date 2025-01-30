@@ -1,3 +1,7 @@
+import { readFile } from 'fs/promises';
+import * as path from 'path';
+import { HttpException, HttpStatus } from '@nestjs/common';
+
 export function executeFunction<F extends (...args: any[]) => any>(
   parent: any,
   funcName: string,
@@ -16,7 +20,6 @@ export function executeFunction<F extends (...args: any[]) => any>(
   return boundFunc(...args);
 }
 
-// Fonction utilitaire pour obtenir les noms des paramètres d'une fonction
 function getFunctionParameterNames(func: Function): string[] {
   const fnStr = func.toString();
   const paramMatch = fnStr.match(/\(([^)]*)\)/);
@@ -29,3 +32,36 @@ function getFunctionParameterNames(func: Function): string[] {
     .map(param => param.trim())
     .filter(param => param);
 }
+
+export async function projectName(): Promise<string> {
+  if (!this.msName) {
+    var data = await readFile(
+      path.join(
+        process.cwd(),
+        'package.json',
+      )
+    )
+    const { name } = JSON.parse(data.toString());
+    this.msName = name;
+  }
+  return this.msName;
+}
+
+export function withWatchdog<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new HttpException(`Gateway Timeout`,HttpStatus.GATEWAY_TIMEOUT));
+    }, timeoutMs);
+
+    promise
+      .then((result) => {
+        clearTimeout(timer);
+        resolve(result);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
