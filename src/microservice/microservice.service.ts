@@ -26,10 +26,10 @@ export class MicroserviceService {
   }
 
   private static async registerService() {
-    const projectName = await utils.projectName();
+    const microServiceName = await utils.microServiceName();
     const serviceData = {
-      ID: projectName,
-      Name: projectName,
+      ID: microServiceName,
+      Name: microServiceName,
       Address: this.serviceAddress.address,
       Port: this.serviceAddress.port,
       Check: {
@@ -47,7 +47,7 @@ export class MicroserviceService {
   private static async getServerAddress(): Promise<net.AddressInfo> {
     if (process.env.AWS_REGION)
       return{
-        address:`haku-sci-${await utils.projectName()}-${process.env.BRANCH}.${process.env.AWS_REGION}.elasticbeanstalk.com`,
+        address:`haku-sci-${await utils.microServiceName()}-${process.env.BRANCH}.${process.env.AWS_REGION}.elasticbeanstalk.com`,
         port:3000
       } as net.AddressInfo 
     // Create a new TCP serveur to get an available port
@@ -75,7 +75,7 @@ export class MicroserviceService {
   }
 
   private static async startRabbitMQMicroService(appModule): Promise<INestMicroservice> {
-    const queue=await utils.projectName();
+    const queue=await utils.microServiceName();
     const app = await NestFactory.createMicroservice<MicroserviceOptions>(appModule, {
       transport: Transport.RMQ,
       options: {

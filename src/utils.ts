@@ -10,14 +10,13 @@ export function executeFunction<F extends (...args: any[]) => any>(
   const func=parent[funcName]
   const boundFunc = func.bind(parent);
 
-  // Obtenir les noms des paramètres de la fonction
-  const paramNames = getFunctionParameterNames(func);
-
-  // Reconstituer les arguments dans le bon ordre
-  const args = paramNames.map(name => params[name]);
-
   // Appeler la fonction avec les arguments
-  return boundFunc(...args);
+  return boundFunc(...getSortedParameters(func,params));
+}
+
+export function getSortedParameters(func: Function,params: Record<string,any>):string []{
+  const paramNames = getFunctionParameterNames(func);
+  return paramNames.map(name => params[name]);
 }
 
 function getFunctionParameterNames(func: Function): string[] {
@@ -33,7 +32,7 @@ function getFunctionParameterNames(func: Function): string[] {
     .filter(param => param);
 }
 
-export async function projectName(): Promise<string> {
+export async function microServiceName(): Promise<string> {
   if (!this.msName) {
     var data = await readFile(
       path.join(
@@ -64,4 +63,3 @@ export function withWatchdog<T>(promise: Promise<T>, timeoutMs: number): Promise
       });
   });
 }
-
