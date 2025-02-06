@@ -6,6 +6,12 @@ import axios from 'axios';
 import { lastValueFrom } from 'rxjs';
 import * as utils from '../utils'
 
+const cloudChecks = [
+  { name: 'AWS', url: 'http://169.254.169.254/latest/meta-data/' },
+  { name: 'Azure', url: 'http://169.254.169.254/metadata/instance?api-version=2021-02-01', headers: { 'Metadata': 'true' } },
+  { name: 'GCP', url: 'http://metadata.google.internal/computeMetadata/v1/', headers: { 'Metadata-Flavor': 'Google' } },
+];
+
 export class MicroserviceService {
   private static serviceAddress: net.AddressInfo;
   private static async getServiceURI(serviceName: string): Promise<{ host: string, port: number }> {
@@ -23,6 +29,20 @@ export class MicroserviceService {
     } else {
       throw new NotFoundException(`Service ${serviceName} not found in Consul catalog`);
     }
+  }
+
+  private static async detectCloudProvider(): Promise<string | false> {
+    
+    for (const { name, url, headers } of cloudChecks) {
+      try {
+        await axios.get(url, { headers, timeout: 1000 });
+        return name;
+      } catch {
+        continue; 
+      }
+    }
+  
+    return false;
   }
 
   private static async registerService() {
@@ -45,7 +65,7 @@ export class MicroserviceService {
   }
 
   private static async getServerAddress(): Promise<net.AddressInfo> {
-    if (process.env.AWS_REGION)
+    if (await this.detectCloudProvider())
       return{
         address:`haku-sci-${await utils.microServiceName()}-${process.env.BRANCH}.${process.env.AWS_REGION}.elasticbeanstalk.com`,
         port:3000
