@@ -10,11 +10,8 @@
             "name": "Front",
             "request": "launch",
             "type": "node-terminal",
+            "envFile":"${workspaceFolder}/../libs/.env",
             "env":{
-                "CURRENT_BRANCH_SUBENDPOINT": "test",
-                "DOMAIN_NAME": "haku-sci.com",
-                "ORCID_CLIENT_ID": "APP-OUNMEXUD3NA11RQC",//"APP-6ACB0ZGSAQ7CAZGU",
-                "ORCID_ENDPOINT": "https://orcid.org",//"https://sandbox.orcid.org",
                 "API_PROTOCOL":"http"
             },
         },
@@ -24,15 +21,9 @@
             "name": "Api",
             "request": "launch",
             "type": "node-terminal",
+            "envFile":"${workspaceFolder}/../.env",
             "env": {
-                "CURRENT_BRANCH_SUBENDPOINT": "test",
-                "DOMAIN_NAME": "haku-sci.com",
                 "PORT":"3001",
-                "CONSUL_URL":"http://localhost:8500",
-                "RABBITMQ_URL":"amqp://localhost:5672",
-                "RABBITMQ_API_URL":"http://localhost:15672/api",
-                "RABBITMQ_USERNAME":"guest",
-                "RABBITMQ_PASSWORD":"guest"
             }
         },
         //Account
@@ -41,17 +32,9 @@
             "name": "Accounts",
             "request": "launch",
             "type": "node-terminal",
+            "envFile":"${workspaceFolder}/../libs/.env",
             "env": {
-              "INIT": "true",
-              "DEBUG": "true",
-              "CONSUL_URL":"http://localhost:8500",
-              "RABBITMQ_URL":"amqp://localhost:5672",
-              "RDS_PORT": "5432",
-              "RDS_HOSTNAME": "localhost",
-              "RDS_USERNAME": "admin",
-              "RDS_PASSWORD": "password",
               "RDS_DBNAME": "accounts",
-              
             }
           },
         //Content
@@ -60,15 +43,8 @@
             "name": "Content",
             "request": "launch",
             "type": "node-terminal",
+            "envFile":"${workspaceFolder}/../libs/.env",
             "env": {
-              "INIT": "false",
-              "DEBUG": "true",
-              "CONSUL_URL":"http://localhost:8500",
-              "RABBITMQ_URL":"amqp://localhost:5672",
-              "RDS_HOSTNAME": "localhost",
-              "RDS_PORT": "5432",
-              "RDS_USERNAME": "admin",
-              "RDS_PASSWORD": "password",
               "RDS_DBNAME": "content_data",
             }
         },
@@ -78,11 +54,8 @@
             "name": "Graph",
             "request": "launch",
             "type": "node-terminal",
+            "envFile":"${workspaceFolder}/../libs/.env",
             "env": {
-                "INIT": "true",
-                "DEBUG": "true",
-                "CONSUL_URL":"http://localhost:8500",
-                "RABBITMQ_URL":"amqp://localhost:5672",
                 "NEO4J_URI":"neo4j://localhost:7687",
                 "NEO4J_USER":"neo4j",
                 "NEO4J_PASSWORD":"password"
@@ -95,10 +68,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/data-processing/app/main.py",
             "console": "integratedTerminal",
-            "env": {
-                "CONSUL_URL":"http://localhost:8500",
-                "RABBITMQ_URL":"amqp://localhost:5672",
-            }
+            "envFile":"${workspaceFolder}/.env"
         },
         //Third-party
         {
@@ -106,15 +76,7 @@
             "name": "Third-party",
             "request": "launch",
             "type": "node-terminal",
-            "env": {
-              "INIT": "true",
-              "DEBUG": "true",
-              "CONSUL_URL":"http://localhost:8500",
-              "ORCID_CLIENT_ID": "APP-OUNMEXUD3NA11RQC",//"APP-6ACB0ZGSAQ7CAZGU",
-              "ORCID_CLIENT_SECRET": "5e84a84e-f083-4b32-85c0-cbc04fc2d288",//"27fbd83b-192a-49c5-9683-7e8633fd0f79",
-              "ORCID_ENDPOINT": "https://orcid.org",//"https://sandbox.orcid.org",
-              "ORCID_API_ENDPOINT": "https://pub.orcid.org/v3.0",//"https://api.sandbox.orcid.org/v3.0",
-            }
+            "envFile":"${workspaceFolder}/.env"
         },
     ]
 }
