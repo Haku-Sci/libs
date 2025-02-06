@@ -21,7 +21,7 @@
             "name": "Api",
             "request": "launch",
             "type": "node-terminal",
-            "envFile":"${workspaceFolder}/../.env",
+            "envFile":"${workspaceFolder}/../libs/.env",
             "env": {
                 "PORT":"3001",
             }
@@ -68,7 +68,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/data-processing/app/main.py",
             "console": "integratedTerminal",
-            "envFile":"${workspaceFolder}/.env"
+            "envFile":"${workspaceFolder}/../libs/.env"
         },
         //Third-party
         {
@@ -76,7 +76,7 @@
             "name": "Third-party",
             "request": "launch",
             "type": "node-terminal",
-            "envFile":"${workspaceFolder}/.env"
+            "envFile":"${workspaceFolder}/../libs/.env"
         },
     ]
 }
