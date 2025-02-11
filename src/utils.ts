@@ -7,14 +7,14 @@ export function executeFunction<F extends (...args: any[]) => any>(
   funcName: string,
   params: Record<string, any>,
 ): ReturnType<F> {
-  const func=parent[funcName]
+  const func = parent[funcName]
   const boundFunc = func.bind(parent);
 
   // Appeler la fonction avec les arguments
-  return boundFunc(...getSortedParameters(func,params));
+  return boundFunc(...getSortedParameters(func, params));
 }
 
-export function getSortedParameters(func: Function,params: Record<string,any>):string []{
+export function getSortedParameters(func: Function, params: Record<string, any>): string[] {
   const paramNames = getFunctionParameterNames(func);
   return paramNames.map(name => params[name]);
 }
@@ -49,7 +49,7 @@ export async function microServiceName(): Promise<string> {
 export function withWatchdog<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
-      reject(new HttpException(`Gateway Timeout`,HttpStatus.GATEWAY_TIMEOUT));
+      reject(new HttpException(`Gateway Timeout`, HttpStatus.GATEWAY_TIMEOUT));
     }, timeoutMs);
 
     promise

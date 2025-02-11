@@ -24,7 +24,7 @@ export class RabbitMqService {
         return this.instance;
     }
 
-    private constructor() {}
+    private constructor() { }
 
     private async init() {
         this.microServiceName = await utils.microServiceName();
@@ -40,7 +40,7 @@ export class RabbitMqService {
 
         await this.amqpConnection.init();
     }
-    
+
     private get ackQueueName() {
         return `${this.microServiceName}_${rabbitMQutils.ACK_QUEUE}`;
     }
@@ -64,7 +64,7 @@ export class RabbitMqService {
             options.correlationId = Date.now().toString();
 
             const response = await axios.get(`${process.env.RABBITMQ_API_URL}/bindings`, { auth: rabbitMqApiAuth });
-            let countExpectedAcknowledged = response.data.filter((binding: any) => 
+            let countExpectedAcknowledged = response.data.filter((binding: any) =>
                 binding.source === rabbitMQutils.HAKU_SCI_EXCHANGE && binding.routing_key === messagePattern).length;
 
             p = new Promise<Record<string, any>>((resolve, reject) => {
@@ -79,21 +79,21 @@ export class RabbitMqService {
     private handleAckResponse(ackMessage: any) {
         const { correlationId, microServiceName, response, error } = ackMessage;
         if (!this.waitAckownledge[correlationId]) return;
-        if (error){
+        if (error) {
             this.waitAckownledge[correlationId].reject(error);
             delete this.waitAckownledge[correlationId];
         }
-        this.waitAckownledge[correlationId].responses[microServiceName]=response
+        this.waitAckownledge[correlationId].responses[microServiceName] = response
         this.waitAckownledge[correlationId].count--;
 
         if (this.waitAckownledge[correlationId].count === 0) {
             this.waitAckownledge[correlationId].resolve(this.waitAckownledge[correlationId].responses);
             delete this.waitAckownledge[correlationId];
         }
-    }    
+    }
 
-    sendAck(message:any){
-        this.amqpConnection.publish('', message.properties.headers.replyTo, message);   
+    sendAck(message: any) {
+        this.amqpConnection.publish('', message.properties.headers.replyTo, message);
     }
 
 }
@@ -105,18 +105,18 @@ export function HakuSubscribe(options: { routingKey: string }): MethodDecorator 
         descriptor.value = async function (...args: any[]) {
             const message = args[1];
             try {
-                message.response=await originalMethod.apply(this, args);
-                message.properties.headers["microService"]=await utils.microServiceName() 
+                message.response = await originalMethod.apply(this, args);
+                message.properties.headers["microService"] = await utils.microServiceName()
             } catch (error) {
-                message.properties.headers["error"]=error;
+                message.properties.headers["error"] = error;
             }
-            finally{
-                if (message.properties.headers.replyTo){
-                    try{
+            finally {
+                if (message.properties.headers.replyTo) {
+                    try {
                         await RabbitMqService.get().then((rabbitMqService) => {
                             rabbitMqService.sendAck(message);
                         });
-                    }catch(e){console.log(e)}
+                    } catch (e) { console.log(e) }
                 };
             }
         }
