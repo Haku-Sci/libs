@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { ClientProxy, ClientProxyFactory, MicroserviceOptions, Transport } from '@nestjs/microservices';
 import * as net from 'net';
 import axios from 'axios';
-import { catchError, lastValueFrom, throwError } from 'rxjs';
+import { catchError, lastValueFrom, throwError, timeout } from 'rxjs';
 import * as utils from '../utils'
 import { RabbitMqService } from 'src/rabbit-mq/rabbit-mq.service';
 
@@ -14,7 +14,7 @@ const cloudChecks = [
 ];
 
 export class MicroserviceService {
-  private static serviceAddress: net.AddressInfo;
+  private static serverAddress: net.AddressInfo;
   private static rabbitMQApp;
   private static appModule;
   private static async getServiceURI(serviceName: string): Promise<{ host: string, port: number }> {
@@ -53,10 +53,10 @@ export class MicroserviceService {
     const serviceData = {
       ID: microServiceName,
       Name: microServiceName,
-      Address: this.serviceAddress.address,
-      Port: this.serviceAddress.port,
+      Address: this.serverAddress.address,
+      Port: this.serverAddress.port,
       Check: {
-        TCP: `${this.serviceAddress.address}:${this.serviceAddress.port}`,
+        TCP: this.host,
         Interval: "10s",
         Timeout: "5s",
         DeregisterCriticalServiceAfter: "1m"
@@ -64,10 +64,10 @@ export class MicroserviceService {
     };
 
     await axios.put(`${process.env["CONSUL_URL"]}/v1/agent/service/register`, serviceData);
-    console.log(`Service registered with Consul on ${this.serviceAddress.address}:${this.serviceAddress.port}`);
+    console.log(`Service registered with Consul on ${this.serverAddress.address}:${this.serverAddress.port}`);
   }
 
-  private static async getServerAddress(): Promise<net.AddressInfo> {
+  private static async defineServerAddress(): Promise<net.AddressInfo> {
     if (await this.detectCloudProvider())
       return {
         address: `haku-sci-${await utils.microServiceName()}-${process.env.BRANCH}.${process.env.AWS_REGION}.elasticbeanstalk.com`,
@@ -81,7 +81,7 @@ export class MicroserviceService {
     address.address = 'localhost';
     address.family = 'IPv4';
     server.close();
-    return address;
+    this.serverAddress=address;
   }
 
   private static async startMainMicroService(): Promise<INestMicroservice> {
@@ -89,7 +89,7 @@ export class MicroserviceService {
       {
         transport: Transport.TCP,
         options: {
-          port: this.serviceAddress.port
+          port: this.serverAddress.port
         }
       },
     );
@@ -114,9 +114,13 @@ export class MicroserviceService {
     return app;
   }
 
+  static get host():string{
+    return `${this.serverAddress.address}:${this.serverAddress.port}`
+  }
+
   static async bootstrapMicroservice(appModule): Promise<INestMicroservice> {
     this.appModule=appModule
-    this.serviceAddress = await this.getServerAddress();
+    await this.defineServerAddress();
 
     // Initialize the database if needed
     if (process.env["RDS_DBNAME"]) {
@@ -145,6 +149,9 @@ export class MicroserviceService {
       const response$ = client.send(messagePattern, payload).pipe(
         catchError(sendErr => {
           return throwError(() => new Error(sendErr));
+        }),
+        timeout({
+          first: 1000
         })
       );
       const result = await lastValueFrom(response$)
