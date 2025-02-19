@@ -1,11 +1,10 @@
-import { INestMicroservice, NotFoundException } from '@nestjs/common';
+import { INestMicroservice, ServiceUnavailableException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ClientProxy, ClientProxyFactory, MicroserviceOptions, Transport } from '@nestjs/microservices';
 import * as net from 'net';
 import axios from 'axios';
 import { catchError, lastValueFrom, throwError, timeout } from 'rxjs';
 import * as utils from '../utils'
-import { RabbitMqService } from 'src/rabbit-mq/rabbit-mq.service';
 
 const cloudChecks = [
   { name: 'AWS', url: 'http://169.254.169.254/latest/meta-data/' },
@@ -30,7 +29,7 @@ export class MicroserviceService {
         port: port,
       };
     } else {
-      throw new NotFoundException(`Service ${serviceName} not found in Consul catalog`);
+      throw new ServiceUnavailableException(`Service ${serviceName} not found in Consul catalog`);
     }
   }
 
