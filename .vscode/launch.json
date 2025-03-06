@@ -26,8 +26,19 @@
                 "PORT":"3001",
             }
         },
-        //Account
+        //Private-content
         {
+            "command": "npm run start:dev --prefix ../services/private-content",
+            "name": "Private-content",
+            "request": "launch",
+            "type": "node-terminal",
+            "envFile":"${workspaceFolder}/../libs/.env",
+            "env": {
+              "RDS_DBNAME": "HakuSci",
+            }
+        },
+        //Account
+        /*{
             "command": "npm run start:dev --prefix ../services/accounts",
             "name": "Accounts",
             "request": "launch",
@@ -36,9 +47,9 @@
             "env": {
               "RDS_DBNAME": "accounts",
             }
-          },
+          },*/
         //Content
-        {
+        /*{
             "command": "npm run start:dev --prefix ../services/content",
             "name": "Content",
             "request": "launch",
@@ -47,7 +58,7 @@
             "env": {
               "RDS_DBNAME": "content_data",
             }
-        },
+        },*/
         //Graph
         {
             "command": "npm run start:dev --prefix ../services/graph",

@@ -140,7 +140,7 @@ export class MicroserviceService {
   }
 
   static async sendTCPMessage(service, messagePattern, payload?): Promise<any> {
-    const client: ClientProxy = ClientProxyFactory.create({
+    const client: ClientProxy = await ClientProxyFactory.create({
       transport: Transport.TCP,
       options: await MicroserviceService.getServiceURI(service),
     });
