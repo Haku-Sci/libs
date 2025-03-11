@@ -1,6 +1,6 @@
 {
   "name": "@haku-sci/utils",
-  "version": "1.8.2",
+  "version": "1.9.2",
   "description": "utils from haku-sci. Library only",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,10 +10,10 @@
     "utils": "^0.3.1",
     "@nestjs/typeorm": "^10.0.2",
     "@nestjs/platform-express": "^10.4.15",
-    "pg": "^8.13.1",
-    "@golevelup/nestjs-rabbitmq": "^5.7.0"
+    "pg": "^8.13.1"
   },
   "dependencies": {
+    "@golevelup/nestjs-rabbitmq": "^5.7.0",
     "amqp-connection-manager": "^4.1.14",
     "amqplib": "^0.10.5",
     "axios": "^1.7.9",

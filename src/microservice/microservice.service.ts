@@ -5,6 +5,7 @@ import * as net from 'net';
 import axios from 'axios';
 import { catchError, lastValueFrom, throwError, timeout } from 'rxjs';
 import * as utils from '../utils'
+import { RabbitMqModule } from '../rabbit-mq/rabbit-mq.module';
 
 const cloudChecks = [
   { name: 'AWS', url: 'http://169.254.169.254/latest/meta-data/' },
@@ -15,7 +16,6 @@ const cloudChecks = [
 export class MicroserviceService {
   private static serverAddress: net.AddressInfo;
   private static rabbitMQApp;
-  private static appModule;
   private static async getServiceURI(serviceName: string): Promise<{ host: string, port: number }> {
     const response = await axios.get(`${process.env["CONSUL_URL"]}/v1/catalog/service/${serviceName}`);
     const serviceInfo = response.data;
@@ -83,8 +83,8 @@ export class MicroserviceService {
     this.serverAddress=address;
   }
 
-  private static async startMainMicroService(): Promise<INestMicroservice> {
-    const app = await NestFactory.createMicroservice<MicroserviceOptions>(this.appModule,
+  private static async startMainMicroService(appModule): Promise<INestMicroservice> {
+    const app = await NestFactory.createMicroservice<MicroserviceOptions>(appModule,
       {
         transport: Transport.TCP,
         options: {
@@ -98,7 +98,7 @@ export class MicroserviceService {
 
   private static async startRabbitMQMicroService(): Promise<INestMicroservice> {
     const queue = await utils.microServiceName();
-    const app = await NestFactory.createMicroservice<MicroserviceOptions>(this.appModule, {
+    const app = await NestFactory.createMicroservice<MicroserviceOptions>(RabbitMqModule, {
       transport: Transport.RMQ,
       options: {
         urls: [process.env.RABBITMQ_URL],
@@ -118,7 +118,6 @@ export class MicroserviceService {
   }
 
   static async bootstrapMicroservice(appModule): Promise<INestMicroservice> {
-    this.appModule=appModule
     await this.defineServerAddress();
 
     // Initialize the database if needed
@@ -128,7 +127,7 @@ export class MicroserviceService {
     }
 
     // Generate Microservice
-    const app = await this.startMainMicroService();
+    const app = await this.startMainMicroService(appModule);
     // Start rabbitmq
     if (process.env.RABBITMQ_URL)
       this.rabbitMQApp=await this.startRabbitMQMicroService();
@@ -145,7 +144,7 @@ export class MicroserviceService {
       options: await MicroserviceService.getServiceURI(service),
     });
     try {
-      const response$ = client.send(messagePattern, payload).pipe(
+      const response$ = await client.send(messagePattern, payload).pipe(
         catchError(sendErr => {
           return throwError(() => new Error(sendErr));
         }),

@@ -1,5 +1,6 @@
 // libs/amqp-lib/src/amqp.service.ts
 import { AmqpConnection, RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
+import { Injectable } from '@nestjs/common';
 import * as rabbitMQutils from './constants';
 import * as utils from '../utils';
 import axios from 'axios';
@@ -8,36 +9,25 @@ const rabbitMqApiAuth = {
     username: process.env.RABBITMQ_USERNAME,
     password: process.env.RABBITMQ_PASSWORD,
 };
-
+@Injectable()
 export class RabbitMqService {
-    static instance: RabbitMqService;
     waitAckownledge: Record<string, { count: number, resolve: () => void, reject: () => void }> = {};
     amqpConnection: AmqpConnection;
     projectName: string;
     ackAttached: boolean = false;
-    static async get(): Promise<RabbitMqService> {
-        if (!this.instance) {
-            this.instance = new RabbitMqService();
-            await this.instance.init();
-        }
-        return this.instance;
-    }
-
-    private constructor() { }
-
-    private async init() {
-        this.projectName = await utils.microServiceName()
-        this.amqpConnection = new AmqpConnection({
-            exchanges: [
-                {
-                    name: rabbitMQutils.HAKU_SCI_EXCHANGE,
-                    type: 'topic',
-                }
-            ],
-            uri: process.env.RABBITMQ_URL,
+    constructor() { 
+        utils.microServiceName().then(projectName=>{
+            this.projectName=projectName;
+            this.amqpConnection = new AmqpConnection({
+                exchanges: [
+                    {
+                        name: rabbitMQutils.HAKU_SCI_EXCHANGE,
+                        type: 'topic',
+                    }
+                ],
+                uri: process.env.RABBITMQ_URL,
+            })
         })
-
-        await this.amqpConnection.init();
     }
 
     private get ackQueueName() {
@@ -106,9 +96,7 @@ export function HakuSubscribe(options: { routingKey: string }): MethodDecorator 
             finally {
                 if (message.properties.headers.replyTo) {
                     try {
-                        await RabbitMqService.get().then((rabbitMqService) => {
-                            rabbitMqService.sendAck(message);
-                        });
+                        await this.moduleRef.get(RabbitMqService).sendAck(message);
                     } catch (e) { console.log(e) }
                 };
             }
