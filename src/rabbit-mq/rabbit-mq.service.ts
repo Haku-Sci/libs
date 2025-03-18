@@ -16,6 +16,8 @@ export class RabbitMqService {
     projectName: string;
     ackAttached: boolean = false;
     constructor() { 
+        if(!process.env.RABBITMQ_URL)
+            return 
         utils.microServiceName().then(projectName=>{
             this.projectName=projectName;
             this.amqpConnection = new AmqpConnection({

@@ -12,7 +12,8 @@
             "type": "node-terminal",
             "envFile":"${workspaceFolder}/../libs/.env",
             "env":{
-                "API_PROTOCOL":"http"
+                "API_PROTOCOL":"http",
+                "PORT":"443"
             },
         },
         //Api
@@ -23,7 +24,7 @@
             "type": "node-terminal",
             "envFile":"${workspaceFolder}/../libs/.env",
             "env": {
-                "PORT":"3001",
+                "PORT":"80",
             }
         },
         //Graph

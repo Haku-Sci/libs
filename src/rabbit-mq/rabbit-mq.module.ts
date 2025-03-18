@@ -3,9 +3,9 @@ import { RabbitMqService } from './rabbit-mq.service';
 import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
 
 @Module({
-    imports:[RabbitMQModule.forRoot({
+    imports:[...process.env.RABBITMQ_URL?[RabbitMQModule.forRoot({
         uri: process.env.RABBITMQ_URL,
-      })],
+      })]:[]],
     providers:[RabbitMqService],
     exports:[RabbitMqService]
 })
