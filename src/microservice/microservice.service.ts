@@ -144,16 +144,15 @@ export class MicroserviceService {
       options: await MicroserviceService.getServiceURI(service),
     });
     try {
-      const response$ = await client.send(messagePattern, payload).pipe(
+      let response$ = await client.send(messagePattern, payload).pipe(
         catchError(sendErr => {
           return throwError(() => new Error(sendErr));
-        }),
-        timeout({
-          first: 1000
         })
       );
-      const result = await lastValueFrom(response$)
-      return result;
+      const watchdogTimeout = parseInt(process.env.WATCHDOG);
+      if (!isNaN(watchdogTimeout) && watchdogTimeout > 0)
+        response$ = response$.pipe(timeout({ first: watchdogTimeout }));
+      return await lastValueFrom(response$)
     }
     catch(e){
       if (e.message=="Error: Connection closed" && this.rabbitMQApp){
