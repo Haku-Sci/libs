@@ -3,6 +3,7 @@ import os
 import shutil
 import socket
 import time
+from pathlib import Path
 
 def is_port_in_use(port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -28,6 +29,18 @@ def is_container_running(container_name):
     )
     return result.stdout.strip() != ""  # Returns True if the container is running
 
+def stop_container(container_name, timeout=10):
+    """Stop a running container."""
+    subprocess.run(["docker", "stop", container_name], check=True)
+    # Attendre que le conteneur soit vraiment arrêté
+    for _ in range(timeout):
+        if not is_container_running(container_name):
+            print(f"Container '{container_name}' stopped successfully.")
+            return True  # Il est bien arrêté
+        time.sleep(1)  # Attente avant de vérifier à nouveau
+    
+    raise RuntimeError(f"Container {container_name} did not stop within {timeout} seconds.")
+    
 def start_container(container_name):
     """Start an existing container."""
     subprocess.run(["docker", "start", container_name], check=True)
@@ -52,20 +65,15 @@ def create_and_run_container(service_config):
         env_args.extend(["-e", f"{key}={value}"])
 
     # Run the Docker container
-    subprocess.run(
-        [
-            "docker",
-            "run",
-            "-d",
-            "--name",
-            container_name,
-            *port_args,
-            *env_args,
-            *additional_args,
-            image,
-        ],
-        check=True
-    )
+    cmd = ["docker", "run", "-d", "--name", container_name, *port_args, *env_args, image]
+    if additional_args:
+        cmd.extend(additional_args)
+
+    subprocess.run(cmd, check=True)
+
+
+    if "on_load" in service_config:
+            subprocess.run(["docker", *service_config["on_load"]], check=True)
     if  "postprocess" in service_config:
         process = subprocess.Popen(
         ["docker", "logs", "-f", container_name],
@@ -95,6 +103,8 @@ def manage_docker_service(service_config):
             print(f"Container '{container_name}' is already running.")
         else:
             print(f"Container '{container_name}' exists but is stopped. Starting...")
+            if "on_load" in service_config:
+                subprocess.run(["docker", *service_config["on_load"]], check=True)
             start_container(container_name)
     else:
         print(f"Container '{container_name}' does not exist. Creating and starting...")
@@ -150,11 +160,14 @@ services = [
     {
         "name": "neo4j",
         "image": "neo4j:latest",
-        "ports": {7474: 7474, 7687: 7687},
+        "ports": {7474: 7474, 7687: 7687, 5005: 5005},
         "env": {
             "NEO4J_AUTH": "neo4j/password",
+            "NEO4J_PLUGINS": '["apoc", "graph-data-science"]',
+            "NEO4J_server_jvm_additional": "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
         },
         "additional_args": [],
+        "on_load":["cp", f"{str(Path('../graph-libs/target/graph-libs-1.0.jar').resolve())}", f"neo4j:/var/lib/neo4j/plugins/graph-libs-1.0.jar"]
     },
 ]
 
