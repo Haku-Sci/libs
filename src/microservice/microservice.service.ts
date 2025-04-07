@@ -3,7 +3,8 @@ import { NestFactory } from '@nestjs/core';
 import { ClientProxy, ClientProxyFactory, MicroserviceOptions, Transport } from '@nestjs/microservices';
 import * as net from 'net';
 import axios from 'axios';
-import { catchError, lastValueFrom, throwError, timeout } from 'rxjs';
+import { catchError, lastValueFrom, throwError, timeout,of, defaultIfEmpty } from 'rxjs';
+
 import * as utils from '../utils'
 import { RabbitMqModule } from '../rabbit-mq/rabbit-mq.module';
 
@@ -145,13 +146,12 @@ export class MicroserviceService {
     });
     try {
       let response$ = await client.send(messagePattern, payload).pipe(
-        catchError(sendErr => {
-          return throwError(() => new Error(sendErr));
-        })
+        catchError(sendErr => throwError(() => new Error(sendErr)))
       );
       const watchdogTimeout = parseInt(process.env.WATCHDOG);
       if (!isNaN(watchdogTimeout) && watchdogTimeout > 0)
         response$ = response$.pipe(timeout({ first: watchdogTimeout }));
+      response$ = response$.pipe(defaultIfEmpty(null));
       return await lastValueFrom(response$)
     }
     catch(e){
