@@ -138,7 +138,7 @@ def manage_consul():
         print("Consul started successfully.")
 
 # Docker service configurations
-services = [
+'''
     {
         "name": "rabbitmq",
         "image": "rabbitmq:management",
@@ -157,6 +157,8 @@ services = [
         },
         "additional_args": [],
     },
+    '''
+services = [    
     {
         "name": "neo4j",
         "image": "neo4j:latest",
@@ -164,7 +166,7 @@ services = [
         "env": {
             "NEO4J_AUTH": "neo4j/password",
             "NEO4J_PLUGINS": '["apoc", "graph-data-science"]',
-            "NEO4J_server_jvm_additional": "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+            #"NEO4J_server_jvm_additional": "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
         },
         "additional_args": [],
         "on_load":["cp", f"{str(Path('../graph-libs/target/graph-libs-1.0.jar').resolve())}", f"neo4j:/var/lib/neo4j/plugins/graph-libs-1.0.jar"]
