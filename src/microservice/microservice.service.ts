@@ -7,6 +7,7 @@ import { catchError, lastValueFrom, throwError, timeout,of, defaultIfEmpty } fro
 
 import * as utils from '../utils'
 import { RabbitMqModule } from '../rabbit-mq/rabbit-mq.module';
+import { AllExceptionsFilter } from './exceptionFilter';
 
 const cloudChecks = [
   { name: 'AWS', url: 'http://169.254.169.254/latest/meta-data/' },
@@ -90,9 +91,11 @@ export class MicroserviceService {
         transport: Transport.TCP,
         options: {
           port: this.serverAddress.port
-        }
+        },
       },
+      
     );
+    app.useGlobalFilters(new AllExceptionsFilter(await utils.microServiceName()));  // Register global exception filter
     await app.listen();
     return app;
   }
@@ -146,7 +149,7 @@ export class MicroserviceService {
     });
     try {
       let response$ = await client.send(messagePattern, payload).pipe(
-        catchError(sendErr => throwError(() => new Error(sendErr)))
+        catchError(sendErr => throwError(() => sendErr))
       );
       const watchdogTimeout = parseInt(process.env.WATCHDOG);
       if (!isNaN(watchdogTimeout) && watchdogTimeout > 0)
