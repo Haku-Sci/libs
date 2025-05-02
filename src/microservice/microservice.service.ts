@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { ClientProxy, ClientProxyFactory, MicroserviceOptions, Transport } from '@nestjs/microservices';
 import * as net from 'net';
 import axios from 'axios';
-import { catchError, lastValueFrom, throwError, timeout,of, defaultIfEmpty } from 'rxjs';
+import { catchError, lastValueFrom, throwError, timeout, of, defaultIfEmpty } from 'rxjs';
 
 import * as utils from '../utils'
 import { RabbitMqModule } from '../rabbit-mq/rabbit-mq.module';
@@ -82,7 +82,7 @@ export class MicroserviceService {
     address.address = 'localhost';
     address.family = 'IPv4';
     server.close();
-    this.serverAddress=address;
+    this.serverAddress = address;
   }
 
   private static async startMainMicroService(appModule): Promise<INestMicroservice> {
@@ -93,7 +93,7 @@ export class MicroserviceService {
           port: this.serverAddress.port
         },
       },
-      
+
     );
     app.useGlobalFilters(new AllExceptionsFilter(await utils.microServiceName()));  // Register global exception filter
     await app.listen();
@@ -117,7 +117,7 @@ export class MicroserviceService {
     return app;
   }
 
-  static get host():string{
+  static get host(): string {
     return `${this.serverAddress.address}:${this.serverAddress.port}`
   }
 
@@ -134,7 +134,7 @@ export class MicroserviceService {
     const app = await this.startMainMicroService(appModule);
     // Start rabbitmq
     if (process.env.RABBITMQ_URL)
-      this.rabbitMQApp=await this.startRabbitMQMicroService();
+      this.rabbitMQApp = await this.startRabbitMQMicroService();
 
     // Register service with consul
     if (process.env["CONSUL_URL"])
@@ -148,6 +148,7 @@ export class MicroserviceService {
       options: await MicroserviceService.getServiceURI(service),
     });
     try {
+      payload.sender = await utils.microServiceName()
       let response$ = await client.send(messagePattern, payload).pipe(
         catchError(sendErr => throwError(() => sendErr))
       );
@@ -157,11 +158,11 @@ export class MicroserviceService {
       response$ = response$.pipe(defaultIfEmpty(null));
       return await lastValueFrom(response$)
     }
-    catch(e){
-      if (e.message=="Error: Connection closed" && this.rabbitMQApp){
+    catch (e) {
+      if (e.message == "Error: Connection closed" && this.rabbitMQApp) {
         await this.rabbitMQApp.close()
         await this.startRabbitMQMicroService()
-      }    
+      }
       throw e
     }
     finally {

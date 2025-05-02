@@ -15,7 +15,8 @@
                 "API_PROTOCOL":"http",
                 "PORT":"443",
                 "HOST":"127.43.0.0",
-                "NODE_OPTIONS": "--inspect=localhost:9231"
+                "NODE_OPTIONS": "--inspect=localhost:9231",
+                "NEXT_PUBLIC_AWS_ACCOUNT_NUMBER":"330486810981",
             },
         },
         //Api
@@ -27,6 +28,17 @@
             "envFile":"${workspaceFolder}/../libs/.env",
             "env": {
                 "PORT":"80",
+            }
+        },
+        //Login
+        {
+            "command": "npm run start:dev --prefix ../services/login",
+            "name": "Login",
+            "request": "launch",
+            "type": "node-terminal",
+            "envFile":"${workspaceFolder}/../libs/.env",
+            "env": {
+                "RDS_DBNAME": "Login"
             }
         },
         //Graph

@@ -13,10 +13,10 @@ export class AllExceptionsFilter implements RpcExceptionFilter<any> {
 
   catch(exception: any, host: ArgumentsHost): Observable<any> {
     this.logger.error('Exception caught in filter:', exception);
-    const { message, status, details } = exception instanceof RpcException?exception.getError() as any:exception
-    
+    const { message, status, details } = exception instanceof RpcException ? exception.getError() as any : exception
+
     this.logger.error('Error payload:', message);
 
-    return throwError(() => new HttpException(message,status || 500,{description:details}));
+    return throwError(() => new HttpException(message, status || 500, { description: details }));
   }
 }

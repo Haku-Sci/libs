@@ -4,6 +4,7 @@ import shutil
 import socket
 import time
 from pathlib import Path
+os.environ["VAULT_ADDR"] = "http://127.0.0.1:8200"
 
 def is_port_in_use(port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -147,6 +148,24 @@ def manage_consul():
         "additional_args": [],
     },
     {
+        "name": "vault",
+        "image": "hashicorp/vault:latest",
+        "ports": {8200: 8200},
+        "env": {
+            "VAULT_DEV_ROOT_TOKEN_ID": "myroot",
+            "VAULT_DEV_LISTEN_ADDRESS": "0.0.0.0:8200"
+        },
+        "additional_args": [
+            "--cap-add=IPC_LOCK",  # required for Vault to lock memory
+            "--restart=unless-stopped"
+        ],
+        "postprocess": {
+            "endCreationLog": "Vault server started!",
+            "postprocessCommand": ["vault", "status"]
+        }
+    },'''
+services = [    
+    {
         "name": "postgres",
         "image": "postgres:latest",
         "ports": {5432: 5432},
@@ -157,8 +176,6 @@ def manage_consul():
         },
         "additional_args": [],
     },
-    '''
-services = [    
     {
         "name": "neo4j",
         "image": "neo4j:latest",
@@ -170,7 +187,7 @@ services = [
         },
         "additional_args": [],
         "on_load":["cp", f"{str(Path('../graph-libs/target/graph-libs-1.0.jar').resolve())}", f"neo4j:/var/lib/neo4j/plugins/graph-libs-1.0.jar"]
-    },
+    }
 ]
 
 if __name__ == "__main__":
