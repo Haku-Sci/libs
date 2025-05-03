@@ -51,7 +51,19 @@
             "env": {
                 "NEO4J_URI":"neo4j://localhost:7687",
                 "NEO4J_USER":"neo4j",
-                "NEO4J_PASSWORD":"password"
+                "NEO4J_PASSWORD":"password",
+                "SUPER_ADMIN_LOGIN":"SuperAdmin@haku-sci.com"
+            }
+        },
+        //Storage
+        {
+            "command": "npm run start:dev --prefix ../services/storage",
+            "name": "Storage",
+            "request": "launch",
+            "type": "node-terminal",
+            "envFile":"${workspaceFolder}/../libs/.env",
+            "env": {
+                "RDS_DBNAME": "Storage"
             }
         },
         //Data-processing
