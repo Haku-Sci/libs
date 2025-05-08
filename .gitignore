@@ -3,3 +3,4 @@ dist/**
 tsconfig.tsbuildinfo
 .vscode/launch.json
 .env
+package-lock.json
