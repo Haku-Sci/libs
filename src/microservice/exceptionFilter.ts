@@ -4,10 +4,9 @@ import { Observable, throwError } from 'rxjs';
 
 @Catch()
 export class AllExceptionsFilter implements RpcExceptionFilter<any> {
-  private readonly logger: Logger;
-
-  constructor(identifier: string) {
-    this.logger = new Logger(identifier);
+  private readonly logger:Logger;
+  constructor(logger: Logger) {
+    this.logger=logger;
     this.logger.log('ExceptionsHandler initialized');
   }
 

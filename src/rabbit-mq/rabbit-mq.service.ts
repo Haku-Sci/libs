@@ -4,7 +4,9 @@ import { Injectable } from '@nestjs/common';
 import * as rabbitMQutils from './constants';
 import * as utils from '../utils';
 import axios from 'axios';
-
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { NestFactory } from '@nestjs/core';
+import { RabbitMqModule } from '../rabbit-mq/rabbit-mq.module';
 const rabbitMqApiAuth = {
     username: process.env.RABBITMQ_USERNAME,
     password: process.env.RABBITMQ_PASSWORD,
@@ -15,9 +17,26 @@ export class RabbitMqService {
     amqpConnection: AmqpConnection;
     projectName: string;
     ackAttached: boolean = false;
+    private async startMicroService(){
+        const queue = await utils.microServiceName();
+        const app = await NestFactory.createMicroservice<MicroserviceOptions>(RabbitMqModule, {
+          transport: Transport.RMQ,
+          options: {
+            urls: [process.env.RABBITMQ_URL],
+            queue: queue,
+            queueOptions: {
+              durable: true,
+            },
+            noAck: false,
+          },
+        });
+        await app.listen();
+        return app;
+    }
     constructor() {
         if (!process.env.RABBITMQ_URL)
             return
+        this.startMicroService();
         utils.microServiceName().then(projectName => {
             this.projectName = projectName;
             this.amqpConnection = new AmqpConnection({

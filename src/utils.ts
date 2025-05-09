@@ -1,6 +1,8 @@
 import { readFile } from 'fs/promises';
 import * as path from 'path';
 import { HttpException, HttpStatus } from '@nestjs/common';
+export const HAKU_SCI_RESOURCE = 'haku:resource';
+export const HAKU_SCI_ACTION = 'haku:action';
 
 export function executeFunction<F extends (...args: any[]) => any>(
   parent: any,
