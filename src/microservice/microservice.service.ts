@@ -56,21 +56,31 @@ export class Microservice {
 
   private static isPortFree(port: number): Promise<boolean> {
     return new Promise((resolve) => {
-      const server = net.createServer()
-        .once('error', () => resolve(false))
-        .once('listening', () => {
-          server.close(() => resolve(true));
-        })
-        .listen(port);
+    const server = net.createServer();
+
+    server.once('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
+        resolve(false);
+      } else {
+        // Pour d'autres erreurs (ex: permission), on considère le port indisponible aussi
+        resolve(false);
+      }
     });
+
+    server.once('listening', () => {
+      server.close(() => resolve(true));
+    });
+
+    server.listen(port, this.serverAddress.address); // Important : écoute sur toutes les interfaces
+  });
   }
 
   private static async setServerAddress(): Promise<void> {
-    while(!this.isPortFree(this.serverAddress.port)) this.serverAddress.port++; 
     this.serverAddress.address=Object.values(os.networkInterfaces())
       .flatMap((iface) => iface ?? []) // filtre null/undefined
       .find((addr) => addr.family === 'IPv4' && !addr.internal)
       .address
+    while(!await this.isPortFree(this.serverAddress.port)) this.serverAddress.port++; 
   }
 
   private static async startMainMicroService(appModule): Promise<INestMicroservice> {
@@ -86,5 +96,9 @@ export class Microservice {
     app.useGlobalFilters(new AllExceptionsFilter(this.logger));  // Register global exception filter
     await app.listen();
     return app;
+  }
+
+  static get host(): string {
+    return `${this.serverAddress.address}:${this.serverAddress.port}`
   }
 }
