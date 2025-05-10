@@ -30,15 +30,15 @@
                 "PORT":"80",
             }
         },
-        //Login
+        //Confidential-properties
         {
-            "command": "npm run start:dev --prefix ../services/login",
-            "name": "Login",
+            "command": "npm run start:dev --prefix ../services/confidential-properties",
+            "name": "Confidential-properties",
             "request": "launch",
             "type": "node-terminal",
             "envFile":"${workspaceFolder}/../libs/.env",
             "env": {
-                "RDS_DBNAME": "Login"
+                "RDS_DBNAME": "Confidential-properties"
             }
         },
         //Graph
@@ -53,17 +53,6 @@
                 "NEO4J_USER":"neo4j",
                 "NEO4J_PASSWORD":"password",
                 "SUPER_ADMIN_LOGIN":"SuperAdmin@haku-sci.com"
-            }
-        },
-        //Storage
-        {
-            "command": "npm run start:dev --prefix ../services/storage",
-            "name": "Storage",
-            "request": "launch",
-            "type": "node-terminal",
-            "envFile":"${workspaceFolder}/../libs/.env",
-            "env": {
-                "RDS_DBNAME": "Storage"
             }
         },
         //Data-processing

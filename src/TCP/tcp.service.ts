@@ -1,8 +1,11 @@
 import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
 import { catchError, lastValueFrom, throwError, timeout, defaultIfEmpty } from 'rxjs';
 import * as utils from '../utils'
-import { Consul } from './consul';
+import { Consul } from '../microservice/consul';
 
+import { Injectable} from '@nestjs/common';
+
+@Injectable()
 export class TCPService{
     static async sendMessage(service, action:string,resource?:string, payload?): Promise<any> {
         const client: ClientProxy = await ClientProxyFactory.create({

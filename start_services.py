@@ -128,14 +128,13 @@ def manage_consul():
         print("Consul is already running on port 8500.")
     else:
         print("Starting Consul...")
-        subprocess.run(
-            [
-                "powershell",
-                "-Command",
-                f"Start-Process -FilePath '{consul_path}' -ArgumentList 'agent -dev'",
-            ],
-            check=True,
+        subprocess.Popen(
+            [consul_path, "agent", "-dev"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NEW_CONSOLE
         )
+        time.sleep(2)
         print("Consul started successfully.")
 
 # Docker service configurations
