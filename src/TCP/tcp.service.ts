@@ -3,7 +3,7 @@ import { catchError, lastValueFrom, throwError, timeout, defaultIfEmpty } from '
 import * as utils from '../utils'
 import { Consul } from '../microservice/consul';
 
-import { ArgumentsHost, Injectable, Logger } from '@nestjs/common';
+import { ArgumentsHost, HttpException, Injectable, Logger } from '@nestjs/common';
 import { AllExceptionsFilter } from '../microservice/exceptionFilter';
 import { PATTERN_METADATA } from '@nestjs/microservices/constants';
 import { PATH_METADATA } from '@nestjs/common/constants';
@@ -19,10 +19,7 @@ export class TCPService {
         try {
             payload.sender = await utils.microServiceName()
             let response$ = await client.send([resource, action].join("/"), payload).pipe(
-                catchError(err => {
-                    const errorPayload = typeof err === 'object' ? err : { message: String(err) };
-                    return throwError(() => new Error(`[${service}] ${errorPayload.message}`));
-                })
+                catchError(err => throwError(() => new HttpException(err,err.status||400)))
             );
             const watchdogTimeout = parseInt(process.env.WATCHDOG);
             if (!isNaN(watchdogTimeout) && watchdogTimeout > 0)
