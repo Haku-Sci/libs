@@ -11,7 +11,7 @@ import { RESTRICT_SENDER_KEY } from './restrict-sender.decorator';
 
 @Injectable()
 export class RestrictSenderInterceptor implements NestInterceptor {
-  constructor(private reflector: Reflector) {}
+  constructor(private reflector: Reflector) { }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const ctx = context.switchToRpc();
@@ -37,13 +37,13 @@ export class RestrictSenderInterceptor implements NestInterceptor {
     }
 
     // Cas 2 : méthode définit ses propres règles (prioritaire)
-    const allowedSenders:string[] | string = methodRestriction ?? classRestriction ?? [];
+    const allowedSenders: string[] | string = methodRestriction ?? classRestriction ?? [];
 
     if (allowedSenders === '*') {
       return next.handle(); // normalement inutile ici, mais sécurité
     }
 
-    if (allowedSenders!==sender && !allowedSenders.includes(sender)) {
+    if (allowedSenders !== sender && !allowedSenders.includes(sender)) {
       throw new ForbiddenException(`Sender '${sender}' is not authorized`);
     }
 

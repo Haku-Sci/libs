@@ -17,18 +17,18 @@ export class RabbitMqService {
     amqpConnection: AmqpConnection;
     projectName: string;
     ackAttached: boolean = false;
-    private async startMicroService(){
+    private async startMicroService() {
         const queue = await utils.microServiceName();
         const app = await NestFactory.createMicroservice<MicroserviceOptions>(RabbitMqModule, {
-          transport: Transport.RMQ,
-          options: {
-            urls: [process.env.RABBITMQ_URL],
-            queue: queue,
-            queueOptions: {
-              durable: true,
+            transport: Transport.RMQ,
+            options: {
+                urls: [process.env.RABBITMQ_URL],
+                queue: queue,
+                queueOptions: {
+                    durable: true,
+                },
+                noAck: false,
             },
-            noAck: false,
-          },
         });
         await app.listen();
         return app;

@@ -3,20 +3,26 @@ import { catchError, lastValueFrom, throwError, timeout, defaultIfEmpty } from '
 import * as utils from '../utils'
 import { Consul } from '../microservice/consul';
 
-import { Injectable} from '@nestjs/common';
+import { ArgumentsHost, Injectable, Logger } from '@nestjs/common';
+import { AllExceptionsFilter } from '../microservice/exceptionFilter';
+import { PATTERN_METADATA } from '@nestjs/microservices/constants';
+import { PATH_METADATA } from '@nestjs/common/constants';
+import { DiscoveryModule, DiscoveryService } from '@golevelup/nestjs-discovery';
 
 @Injectable()
-export class TCPService{
-    static async sendMessage(service, action:string,resource?:string, payload?): Promise<any> {
+export class TCPService {
+    static async sendMessage(service, action: string, resource?: string, payload?): Promise<any> {
         const client: ClientProxy = await ClientProxyFactory.create({
             transport: Transport.TCP,
             options: await Consul.getServiceURI(service),
         });
         try {
             payload.sender = await utils.microServiceName()
-            let response$ = await client.send([resource,action].join("/"), payload).pipe(
-                catchError(err => {const errorPayload = typeof err === 'object' ? err : { message: String(err) };
-                return throwError(() => new Error(`[${service}] ${errorPayload.message}`));})
+            let response$ = await client.send([resource, action].join("/"), payload).pipe(
+                catchError(err => {
+                    const errorPayload = typeof err === 'object' ? err : { message: String(err) };
+                    return throwError(() => new Error(`[${service}] ${errorPayload.message}`));
+                })
             );
             const watchdogTimeout = parseInt(process.env.WATCHDOG);
             if (!isNaN(watchdogTimeout) && watchdogTimeout > 0)
@@ -24,20 +30,9 @@ export class TCPService{
             response$ = response$.pipe(defaultIfEmpty(null));
             const result = await lastValueFrom(response$);
             if (result?.error)
-                throw new Error(`[${service}] ${result.message}`);
+                throwError(() => new Error(`[${service}] ${result.message}`));
             return result;
         }
-        /*catch (e) {
-            if(e.message.includes("There is no matching message handler defined in the remote service.")){
-                this.sendTCPMessage(service, action,null, payload)
-                return;
-            }
-            if (e.message == "Error: Connection closed" && this.rabbitMQApp) {
-                await this.rabbitMQApp.close()
-                await this.startRabbitMQMicroService()
-            }
-            throw e
-        }*/
         finally {
             try {
                 await client.close();
@@ -45,5 +40,49 @@ export class TCPService{
                 console.error("Error closing client:", closeError.message);
             }
         }
+    }
+
+    static async registerHakuSciMessageHandlers(app: any, logger: Logger) {
+        const moduleRef = app.select(DiscoveryModule);
+        const discoveryService = moduleRef.get(DiscoveryService, { strict: false });
+
+        const controllers = await discoveryService.controllers(() => true);
+        for (const { instance } of controllers) {
+            const resource: string = Reflect.getMetadata(PATH_METADATA, instance.constructor).replace("/", "");
+            const prototype = Object.getPrototypeOf(instance);
+            for (const propertyName of Object.getOwnPropertyNames(prototype)) {
+                const method = prototype[propertyName];
+                if (propertyName === 'constructor' || typeof method !== 'function') continue;
+                const action = Reflect.getMetadata(PATTERN_METADATA, method)?.[0];
+                if (action) {
+
+                    const handler = TCPService.wrapHandler(instance, propertyName, logger);
+                    app.serverInstance.addHandler([resource, action].join("/"), handler, false);
+                }
+            }
+        }
+    }
+
+    private static wrapHandler(
+        instance: any,
+        methodName: string,
+        logger: Logger
+    ): (...args: any[]) => any {
+        return async function boundHandler(data: any, context: any) {
+            try {
+                // Appel de la méthode d’origine
+                return await instance[methodName].call(instance, data);
+            } catch (err) {
+                // Reconstruction minimale d’un ArgumentsHost RPC
+                const host: ArgumentsHost = {
+                    switchToRpc: () => ({ getContext: () => context }),
+                    getArgByIndex: (i: number) => (i === 0 ? data : context),
+                    // les autres méthodes ne seront pas utilisées ici
+                } as any;
+
+                // Renvoi de l’Observable d’erreur produit par le filtre
+                return new AllExceptionsFilter(logger).catch(err, host);
+            }
+        };
     }
 }

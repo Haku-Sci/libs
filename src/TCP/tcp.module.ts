@@ -4,7 +4,7 @@ import { Reflector } from '@nestjs/core';
 import { RestrictSenderInterceptor } from './restrict-sender.interceptor';
 
 @Module({
-    providers:[TCPService,Reflector, RestrictSenderInterceptor],
-    exports:[TCPService]
+    providers: [TCPService, Reflector, RestrictSenderInterceptor],
+    exports: [TCPService]
 })
-export class TcpModule {}
+export class TcpModule { }

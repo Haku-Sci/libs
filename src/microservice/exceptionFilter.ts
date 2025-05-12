@@ -1,21 +1,27 @@
-import { Catch, ArgumentsHost, RpcExceptionFilter, Logger, HttpException } from '@nestjs/common';
-import { RpcException } from '@nestjs/microservices';
+import { Catch, ArgumentsHost, Logger, RpcExceptionFilter } from '@nestjs/common';
 import { Observable, throwError } from 'rxjs';
-
-@Catch()
+import { RpcException } from '@nestjs/microservices';
+@Catch(RpcException)
 export class AllExceptionsFilter implements RpcExceptionFilter<any> {
-  private readonly logger:Logger;
+  private readonly logger: Logger;
   constructor(logger: Logger) {
-    this.logger=logger;
+    this.logger = logger;
     this.logger.log('ExceptionsHandler initialized');
+  }
+  handleUnknownError(exception: any, status: string): Observable<never> {
+    return this.handleException(exception) as Observable<never>;
+  }
+
+  isError(exception: any): exception is Error {
+    throw new Error('Method not implemented.');
   }
 
   catch(exception: any, host: ArgumentsHost): Observable<any> {
+    return this.handleException(exception);
+  }
+
+  private handleException(exception: any): Observable<any | never> {
     this.logger.error('Exception caught in filter:', exception);
-    const { message, status, details } = exception instanceof RpcException ? exception.getError() as any : exception
-
-    this.logger.error('Error payload:', message);
-
-    return throwError(() => new HttpException(message, status || 500, { description: details }));
+    return throwError(() => exception.getError());
   }
 }
