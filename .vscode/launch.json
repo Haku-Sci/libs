@@ -41,6 +41,18 @@
                 "RDS_DBNAME": "Confidential-properties"
             }
         },
+        //Cron
+        {
+            "name": "Cron",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "../services/cron/main.go",
+            "envFile":"${workspaceFolder}/../libs/.env", 
+            "console": "integratedTerminal",
+            "showLog": true 
+        },
+
         //Graph
         {
             "command": "npm run start:dev --prefix ../services/graph",
@@ -72,11 +84,17 @@
             "type": "node-terminal",
             "envFile":"${workspaceFolder}/../libs/.env",
             "env":{
-                "RDS_DBNAME":"email-templates",
+                "RDS_DBNAME":"third-party",
                 "SMTP_PORT":"587",
-                "FROM_USERNAME":"Haku-Sci"
-                
+                "FROM_USERNAME":"Haku-Sci",
+                "UNPAYWALL_URL":"https://api.unpaywall.org/v2",
+                "SEMANTIC_SCHOLAR_URL":"https://api.semanticscholar.org/graph/v1/paper/search",
+                "OPEN_ALEX_URL":"https://api.openalex.org/works",
+                "PUBMED_ESEARCH_URL":"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
+                "PUBMED_EFETCH_URL":"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
+                "PUBMED_ABSTRACT_URL":"https://pubmed.ncbi.nlm.nih.gov",
+                "DOI_URL":"https://doi.org",
             }
-        },
+        }
     ]
 }

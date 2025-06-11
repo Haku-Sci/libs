@@ -33,12 +33,12 @@ def is_container_running(container_name):
 def stop_container(container_name, timeout=10):
     """Stop a running container."""
     subprocess.run(["docker", "stop", container_name], check=True)
-    # Attendre que le conteneur soit vraiment arrêté
+    # wait for container to stop
     for _ in range(timeout):
         if not is_container_running(container_name):
             print(f"Container '{container_name}' stopped successfully.")
-            return True  # Il est bien arrêté
-        time.sleep(1)  # Attente avant de vérifier à nouveau
+            return True  # Is stopped
+        time.sleep(1)  # Wait for 1 second before checking again
     
     raise RuntimeError(f"Container {container_name} did not stop within {timeout} seconds.")
     
@@ -72,7 +72,6 @@ def create_and_run_container(service_config):
 
     subprocess.run(cmd, check=True)
 
-
     if "on_load" in service_config:
             subprocess.run(["docker", *service_config["on_load"]], check=True)
     if  "postprocess" in service_config:
@@ -85,7 +84,6 @@ def create_and_run_container(service_config):
         try:
             line=""
             while not line or service_config["postprocess"]["endCreationLog"] not in line :
-                # Lire les lignes des logs au fur et à mesure
                 line = process.stdout.readline()
                 time.sleep(0.1)  
             subprocess.run(["docker", "exec", container_name, *service_config["postprocess"]["postprocessCommand"]],check=True)
