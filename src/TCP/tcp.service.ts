@@ -3,7 +3,7 @@ import { catchError, lastValueFrom, throwError, timeout, defaultIfEmpty } from '
 import * as utils from '../utils'
 import { Consul } from '../microservice/consul';
 
-import { ArgumentsHost, HttpException, Injectable, Logger } from '@nestjs/common';
+import { ArgumentsHost, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AllExceptionsFilter } from '../microservice/exceptionFilter';
 import { PATTERN_METADATA } from '@nestjs/microservices/constants';
 import { PATH_METADATA } from '@nestjs/common/constants';
@@ -19,7 +19,16 @@ export class TCPService {
         try {
             payload.sender = await utils.microServiceName()
             let response$ = await client.send([resource, action].join("/"), payload).pipe(
-                catchError(err => throwError(() => new HttpException(err,err.status||400)))
+                catchError(err => {
+                    const status = err?.status || HttpStatus.BAD_REQUEST;
+                    const payload = {
+                        ...(typeof err === 'object' ? err : { message: err }),
+                        service, 
+                    };
+                    return throwError(
+                        () => new HttpException(payload, status)
+                    );
+                })
             );
             const watchdogTimeout = parseInt(process.env.WATCHDOG);
             if (!isNaN(watchdogTimeout) && watchdogTimeout > 0)
@@ -58,6 +67,7 @@ export class TCPService {
                 }
             }
         }
+        logger.log("HakuSci Message Handlers initialized")
     }
 
     private static wrapHandler(
