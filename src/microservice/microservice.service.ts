@@ -8,6 +8,7 @@ import { AllExceptionsFilter } from './exceptionFilter';
 import * as os from 'os';
 import { Consul } from './consul';
 import { TCPService } from '../TCP/tcp.service';
+import { HttpHealthAppModule } from '../minimal-app/http-health.module';
 
 export class Microservice {
   private static serverAddress: net.AddressInfo = { family: 'IPv4', port: 3000, address: null };
@@ -22,8 +23,10 @@ export class Microservice {
       postGresService.createDatabaseIfNotExists()
     }
 
-    // Start Microservice
-    const app = await this.startMainMicroService(appModule);
+    // Start Microservices
+    if(process.env.CLOUD_PORT)
+      await(await NestFactory.create(HttpHealthAppModule)).listen(process.env.CLOUD_PORT,'0.0.0.0') 
+    const app = await this.startTCPMicroService(appModule);
 
     //Handle HakuSciMessagePattern
     await TCPService.registerHakuSciMessageHandlers(app, this.logger);
@@ -62,11 +65,11 @@ export class Microservice {
       this.serverAddress.port=parseInt(process.env.PORT);
     else
       while (!await this.isPortFree(this.serverAddress.port)) this.serverAddress.port++;
-    this.logger.log("address to be listened to:",this.serverAddress.address);
-    this.logger.log("port to be listened to:",this.serverAddress.port);
+    this.logger.log("address to be listened to: "+this.serverAddress.address);
+    this.logger.log("port to be listened to: "+this.serverAddress.port);
   }
 
-  private static async startMainMicroService(appModule): Promise<INestMicroservice> {
+  private static async startTCPMicroService(appModule): Promise<INestMicroservice> {
     const app = await NestFactory.createMicroservice<MicroserviceOptions>(appModule,
       {
         transport: Transport.TCP,
