@@ -14,7 +14,7 @@ export class Microservice {
   static logger: Logger;
 
   static async bootstrapMicroservice(appModule): Promise<void> {
-    this.setServerAddress();
+    await this.setServerAddress();
     this.logger = new Logger(await utils.microServiceName())
     // Initialize the database if needed
     if (process.env[process.env.ENV_POSTGRESQL_DB] && process.env.DEBUG) {
@@ -66,7 +66,8 @@ export class Microservice {
       {
         transport: Transport.TCP,
         options: {
-          port: this.serverAddress.port
+          port: this.serverAddress.port,
+          host: this.serverAddress.address,
         },
       },
 
