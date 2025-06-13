@@ -10,7 +10,7 @@ import { Consul } from './consul';
 import { TCPService } from '../TCP/tcp.service';
 
 export class Microservice {
-  private static serverAddress: net.AddressInfo = { family: 'IPv4', port: parseInt(process.env.PORT)||3000, address: null };
+  private static serverAddress: net.AddressInfo = { family: 'IPv4', port: 3000, address: null };
   static logger: Logger;
 
   static async bootstrapMicroservice(appModule): Promise<void> {
@@ -58,7 +58,12 @@ export class Microservice {
       .flatMap((iface) => iface ?? []) // filtre null/undefined
       .find((addr) => addr.family === 'IPv4' && !addr.internal)
       .address
-    while (!await this.isPortFree(this.serverAddress.port)) this.serverAddress.port++;
+    if(parseInt(process.env.PORT))
+      this.serverAddress.port=parseInt(process.env.PORT);
+    else
+      while (!await this.isPortFree(this.serverAddress.port)) this.serverAddress.port++;
+    this.logger.log("address to be listened to:",this.serverAddress.address);
+    this.logger.log("port to be listened to:",this.serverAddress.port);
   }
 
   private static async startMainMicroService(appModule): Promise<INestMicroservice> {
