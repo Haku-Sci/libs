@@ -10,7 +10,7 @@ import { Consul } from './consul';
 import { TCPService } from '../TCP/tcp.service';
 
 export class Microservice {
-  private static serverAddress: net.AddressInfo = { family: 'IPv4', port: 3000, address: null };
+  private static serverAddress: net.AddressInfo = { family: 'IPv4', port: parseInt(process.env.PORT)||3000, address: null };
   static logger: Logger;
 
   static async bootstrapMicroservice(appModule): Promise<void> {
