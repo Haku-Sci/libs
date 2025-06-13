@@ -14,8 +14,8 @@ export class Microservice {
   static logger: Logger;
 
   static async bootstrapMicroservice(appModule): Promise<void> {
-    await this.setServerAddress();
     this.logger = new Logger(await utils.microServiceName())
+    await this.setServerAddress();
     // Initialize the database if needed
     if (process.env[process.env.ENV_POSTGRESQL_DB] && process.env.DEBUG) {
       const postGresService = require('./postgres.service');
