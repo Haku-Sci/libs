@@ -54,7 +54,7 @@ export class Microservice {
   }
 
   private static async setServerAddress(): Promise<void> {
-    this.serverAddress.address = process.env.DEBUG ? "127.0.0.1" : Object.values(os.networkInterfaces())
+    this.serverAddress.address = process.env.ADDRESS??process.env.DEBUG ? "127.0.0.1" : Object.values(os.networkInterfaces())
       .flatMap((iface) => iface ?? []) // filtre null/undefined
       .find((addr) => addr.family === 'IPv4' && !addr.internal)
       .address
