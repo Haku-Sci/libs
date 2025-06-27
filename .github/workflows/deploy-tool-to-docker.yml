@@ -57,7 +57,7 @@ jobs:
 
       - name: Deploy via SSH
         run: |
-          SERVER="${{ inputs.target-server }}"
+          SERVER="-p ${{ vars.SSH_PORT }} ${{ vars.SSH_USER }}@${{ inputs.target-server }}"
           TOOL="${{ inputs.tool }}"
           ARGS="${{ steps.load_json.outputs.docker_args }}"
           EXTRA="${{ inputs.extra_args }}"
