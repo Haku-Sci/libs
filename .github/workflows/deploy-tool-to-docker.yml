@@ -1,0 +1,63 @@
+name: Deploy tool to docker
+
+on:
+  workflow_dispatch:
+    inputs:
+      target-server:
+        description: 'Target SSH server (user@host:port)'
+        required: true
+        type: string
+      tool:
+        description: 'Docker tool to run (must match a JSON file in docker-tools/)'
+        required: true
+        type: choice
+        options:
+          - caddy
+          - neo4j
+          - postgresql
+
+jobs:
+  run-tool:
+    name: Run Selected Docker Tool
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Validate selection and load JSON
+        id: load_json
+        run: |
+          TOOL="${{ inputs.tool }}"
+          FILE="docker-tools/${TOOL}.json"
+          echo "::debug::Tool = $TOOL"
+          if [ ! -f "$FILE" ]; then
+            echo "::error:: The file '$FILE' does not exist!"
+            exit 1
+          fi
+          # Extract JSON array of args
+          ARGS=$(jq -r '.[]' "$FILE")
+          echo "::debug::ARGS =<<EOF"
+          echo "$ARGS"
+          echo "EOF"
+          # Join lines with spaces
+          ARGS_JOINED=$(echo "$ARGS" | xargs)
+          echo "docker_args=$ARGS_JOINED" >> "$GITHUB_OUTPUT"
+
+      - name: Debug: show final docker command
+        run: |
+          echo "docker run -d --name ${{ inputs.tool }} ${{ steps.load_json.outputs.docker_args }}"
+
+      - name: Deploy via SSH
+        run: |
+          SERVER="${{ inputs.target-server }}"
+          TOOL="${{ inputs.tool }}"
+          ARGS="${{ steps.load_json.outputs.docker_args }}"
+
+          echo "Connecting to $SERVER..."
+          ssh -o StrictHostKeyChecking=no "$SERVER" \
+            "docker rm -f \"$TOOL\" || true"
+          
+          ssh -o StrictHostKeyChecking=no "$SERVER" \
+            "docker run -d --name \"$TOOL\" $ARGS"
