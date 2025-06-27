@@ -63,9 +63,9 @@ jobs:
           EXTRA="${{ inputs.extra_args }}"
 
           echo "Connecting to $SERVER..."
-          ssh -o StrictHostKeyChecking=no "$SERVER" \
+          ssh -o StrictHostKeyChecking=no $SERVER \
             "docker rm -f \"$TOOL\" || true"
 
           echo "Running docker run with all args..."
-          ssh -o StrictHostKeyChecking=no "$SERVER" \
+          ssh -o StrictHostKeyChecking=no $SERVER \
             "docker run -d --name \"$TOOL\" $ARGS $EXTRA"
