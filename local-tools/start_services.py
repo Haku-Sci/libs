@@ -183,7 +183,7 @@ services = [
             #"NEO4J_server_jvm_additional": "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
         },
         "additional_args": [],
-        "on_load":["cp", f"{str(Path('../graph-libs/target/graph-libs-1.0.jar').resolve())}", f"neo4j:/var/lib/neo4j/plugins/graph-libs-1.0.jar"]
+        "on_load":["cp", f"{str(Path('../neo4j/target/graph-libs-1.0.jar').resolve())}", f"neo4j:/var/lib/neo4j/plugins/graph-libs-1.0.jar"]
     }
 ]
 
