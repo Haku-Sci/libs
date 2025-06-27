@@ -1,0 +1,84 @@
+name: deploy-to-server
+
+on:
+  workflow_call:
+   
+jobs:
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Build Docker image
+      - name: Build Docker image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          platforms: ${{ vars.DOCKER_PLATFORM }}
+          tags: ${{ github.repository }}:latest
+
+      # Start SSH agent
+      - name: Start ssh-agent
+        uses: webfactory/ssh-agent@v0.4.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      # Transfer Docker image to remote server
+      - name: Transfer Docker image
+        run: |
+          docker save ${{ github.repository }}:latest | ssh -o StrictHostKeyChecking=no -p ${{ vars.SSH_PORT }} ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} docker load
+
+      - name: Set port redirection if needed
+        id: set_redirectports
+        run: |
+          REDIRECT_PORT=""
+          if [ -n "${{ vars.DOCKER_PORT_REDIRECT }}" ]; then
+            REDIRECT_PORT="-p ${{ vars.DOCKER_PORT_REDIRECT }}"
+          fi
+          echo "redirected_ports=$REDIRECT_PORT" >> "$GITHUB_OUTPUT"
+      
+      - name: Prepare all env and secret variables
+        id: set_env_vars
+        env:
+          ALL_SECRETS: ${{ toJson(secrets) }}
+          ALL_VARS: ${{ toJson(vars) }}
+        run: |
+          ENV_RUN=""
+          
+          # Inject non-secret variables (vars)
+          for key in $(echo "$ALL_VARS" | jq -r 'keys[]'); do
+            if [[ "$key" =~ ^(GITHUB|SSH|DOCKER) ]]; then
+              continue
+            fi
+            value=$(echo "$ALL_VARS" | jq -r --arg k "$key" '.[$k]')
+            value_escaped=$(printf '%s' "$value" | sed 's/"/\\"/g')
+            ENV_RUN+=" -e $key=\"$value_escaped\""
+          done
+      
+          # Inject secrets
+          for key in $(echo "$ALL_SECRETS" | jq -r 'keys[]'); do
+            if [[ "$key" =~ ^(GITHUB|SSH|DOCKER) ]]; then
+              continue
+            fi
+            value=$(echo "$ALL_SECRETS" | jq -r --arg k "$key" '.[$k]')
+            value_escaped=$(printf '%s' "$value" | sed 's/"/\\"/g')
+            ENV_RUN+=" -e $key=\"$value_escaped\""
+          done
+      
+          echo "env_run=$ENV_RUN" >> "$GITHUB_OUTPUT"
+      
+      - name: Deploy via docker-compose or docker run
+        run: |
+            ssh -o StrictHostKeyChecking=no -p ${{ vars.SSH_PORT }} ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} \
+              "docker rm -f app || true && docker run -d --name app ${{ steps.set_redirectports.outputs.redirected_ports }}${{ steps.set_env_vars.outputs.env_run }} ${{ github.repository }}:latest"
+          
