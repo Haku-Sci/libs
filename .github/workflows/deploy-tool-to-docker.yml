@@ -55,6 +55,12 @@ jobs:
           echo "Tool args: ${{ steps.load_json.outputs.docker_args }}"
           echo "Extra args: ${{ inputs.extra_args }}"
 
+      # Start SSH agent
+      - name: Start ssh-agent
+        uses: webfactory/ssh-agent@v0.4.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
       - name: Deploy via SSH
         run: |
           SERVER="-p ${{ vars.SSH_PORT }} ${{ vars.SSH_USER }}@${{ inputs.target-server }}"
