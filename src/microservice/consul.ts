@@ -2,19 +2,20 @@ import axios from "axios";
 import * as net from 'net';
 import * as utils from '../utils'
 import { Logger, ServiceUnavailableException } from '@nestjs/common';
-
 export class Consul {
   static async registerService(serverAddress: net.AddressInfo, logger: Logger) {
     if (!process.env["CONSUL_URL"])
       return;
+    const externalAddress=process.env.SERVICE_PUBLIC_HOSTNAME || serverAddress.address;
+    const externalPort=parseInt(process.env.SERVICE_PUBLIC_PORT) || serverAddress.port
     const microServiceName = await utils.microServiceName();
     const serviceData = {
       ID: microServiceName,
       Name: microServiceName,
-      Address: serverAddress.address,
-      Port: serverAddress.port,
+      Address: externalAddress,
+      Port: externalPort,
       Check: {
-        TCP: `${serverAddress.address}:${serverAddress.port}`,
+        TCP: `${externalAddress}:${externalPort}`,
         Interval: "10s",
         Timeout: "5s",
         DeregisterCriticalServiceAfter: "1m"
@@ -22,7 +23,7 @@ export class Consul {
     };
 
     await axios.put(`${process.env["CONSUL_URL"]}/v1/agent/service/register`, serviceData);
-    logger.log(`Service registered with Consul on ${serverAddress.address}:${serverAddress.port}`);
+    logger.log(`Service registered with Consul on ${externalAddress}:${externalPort}`);
   }
 
   static async getServiceURI(serviceName: string): Promise<{ host: string, port: number }> {

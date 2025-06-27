@@ -24,8 +24,8 @@ export class Microservice {
     }
 
     // Start Microservices
-    if(process.env.CLOUD_PORT)
-      await(await NestFactory.create(HttpHealthAppModule)).listen(process.env.CLOUD_PORT,'0.0.0.0') 
+    if(process.env.HTTP_PORT)
+      await(await NestFactory.create(HttpHealthAppModule)).listen(process.env.HTTP_PORT,'0.0.0.0') 
     const app = await this.startTCPMicroService(appModule);
 
     //Handle HakuSciMessagePattern
@@ -40,19 +40,14 @@ export class Microservice {
       const server = net.createServer();
 
       server.once('error', (err: NodeJS.ErrnoException) => {
-        if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
           resolve(false);
-        } else {
-          // Pour d'autres erreurs (ex: permission), on considère le port indisponible aussi
-          resolve(false);
-        }
       });
 
       server.once('listening', () => {
         server.close(() => resolve(true));
       });
 
-      server.listen(port, this.serverAddress.address); // Important : écoute sur toutes les interfaces
+      server.listen(port, this.serverAddress.address);
     });
   }
 
@@ -61,8 +56,8 @@ export class Microservice {
       .flatMap((iface) => iface ?? []) // filtre null/undefined
       .find((addr) => addr.family === 'IPv4' && !addr.internal)
       .address
-    if(parseInt(process.env.PORT))
-      this.serverAddress.port=parseInt(process.env.PORT);
+    if(parseInt(process.env.TCP_PORT))
+      this.serverAddress.port=parseInt(process.env.TCP_PORT);
     else
       while (!await this.isPortFree(this.serverAddress.port)) this.serverAddress.port++;
     this.logger.log("address to be listened to: "+this.serverAddress.address);
