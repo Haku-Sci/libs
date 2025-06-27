@@ -12,11 +12,8 @@
             "type": "node-terminal",
             "envFile":"${workspaceFolder}/../libs/.env",
             "env":{
-                "API_PROTOCOL":"http",
                 "PORT":"443",
-                "HOST":"127.43.0.0",
-                "NODE_OPTIONS": "--inspect=localhost:9231",
-                "NEXT_PUBLIC_AWS_ACCOUNT_NUMBER":"330486810981",
+                "HOST":"127.43.0.0"
             },
         },
         //Api
