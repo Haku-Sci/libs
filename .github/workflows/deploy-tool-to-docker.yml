@@ -44,11 +44,6 @@ jobs:
           # Join lines with spaces
           ARGS_JOINED=$(echo "$ARGS" | xargs)
           echo "docker_args=$ARGS_JOINED" >> "$GITHUB_OUTPUT"
-
-      - name: Debug: show final docker command
-        run: |
-          echo "docker run -d --name ${{ inputs.tool }} ${{ steps.load_json.outputs.docker_args }}"
-
       - name: Deploy via SSH
         run: |
           SERVER="${{ inputs.target-server }}"
