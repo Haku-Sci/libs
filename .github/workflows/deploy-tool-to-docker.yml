@@ -1,4 +1,4 @@
-name: Deploy tool to docker
+name: Set docker tool to run on remote server
 
 on:
   workflow_dispatch:
@@ -13,12 +13,16 @@ on:
         type: choice
         options:
           - caddy
-          - neo4j
-          - postgresql
+          - myservice
+          - otherservice
+      extra_args:
+        description: 'Optional additional docker args'
+        required: false
+        type: string
 
 jobs:
   run-tool:
-    name: Run Selected Docker Tool
+    name: Run Selected Docker Tool with Extras
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -26,33 +30,42 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate selection and load JSON
+      - name: Load tool JSON args
         id: load_json
         run: |
           TOOL="${{ inputs.tool }}"
           FILE="docker-tools/${TOOL}.json"
-          echo "::debug::Tool = $TOOL"
           if [ ! -f "$FILE" ]; then
-            echo "::error:: The file '$FILE' does not exist!"
+            echo "::error::File not found: $FILE"
             exit 1
           fi
-          # Extract JSON array of args
+
           ARGS=$(jq -r '.[]' "$FILE")
-          echo "::debug::ARGS =<<EOF"
-          echo "$ARGS"
-          echo "EOF"
-          # Join lines with spaces
           ARGS_JOINED=$(echo "$ARGS" | xargs)
+
           echo "docker_args=$ARGS_JOINED" >> "$GITHUB_OUTPUT"
+          echo "loaded_tool_json<<EOF" >> "$GITHUB_OUTPUT"
+          cat "$FILE" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Debug show values
+        run: |
+          echo "Target server: ${{ inputs.target-server }}"
+          echo "Tool: ${{ inputs.tool }}"
+          echo "Tool args: ${{ steps.load_json.outputs.docker_args }}"
+          echo "Extra args: ${{ inputs.extra_args }}"
+
       - name: Deploy via SSH
         run: |
           SERVER="${{ inputs.target-server }}"
           TOOL="${{ inputs.tool }}"
           ARGS="${{ steps.load_json.outputs.docker_args }}"
+          EXTRA="${{ inputs.extra_args }}"
 
           echo "Connecting to $SERVER..."
           ssh -o StrictHostKeyChecking=no "$SERVER" \
             "docker rm -f \"$TOOL\" || true"
-          
+
+          echo "Running docker run with all args..."
           ssh -o StrictHostKeyChecking=no "$SERVER" \
-            "docker run -d --name \"$TOOL\" $ARGS"
+            "docker run -d --name \"$TOOL\" $ARGS $EXTRA"
