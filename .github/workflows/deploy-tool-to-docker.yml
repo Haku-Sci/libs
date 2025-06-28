@@ -40,22 +40,22 @@ jobs:
             exit 1
           fi
 
-          # Parse image
+          # Retrieve image (always present)
           IMAGE=$(jq -r '.image' "$FILE")
 
-          # Parse options (array)
-          OPTIONS=$(jq -r '.options[]?' "$FILE" | paste -sd ' ' -)
+          # Retrieve options array or empty
+          OPTIONS=$(jq -r '.options // [] | .[]' "$FILE" | paste -sd ' ' -)
 
-          # Parse ports
-          PORTS=$(jq -r '.ports | to_entries[] | "-p \(.key):\(.value)"' "$FILE" | paste -sd ' ' -)
+          # Retrieve ports mapping or empty
+          PORTS=$(jq -r '.ports // {} | to_entries[] | "-p \(.key):\(.value)"' "$FILE" | paste -sd ' ' -)
 
-          # Parse env
-          ENVS=$(jq -r '.env | to_entries[] | "--env \(.key)=\(.value)"' "$FILE" | paste -sd ' ' -)
+          # Retrieve environment variables or empty
+          ENVS=$(jq -r '.env // {} | to_entries[] | "--env \(.key)=\(.value)"' "$FILE" | paste -sd ' ' -)
 
-          # Parse commands
-          COMMANDS=$(jq -r '.commands[]?' "$FILE")
+          # Retrieve commands array or empty
+          COMMANDS=$(jq -r '.commands // [] | .[]' "$FILE")
 
-          # Combine all
+          # Combine Docker arguments
           DOCKER_ARGS="$OPTIONS $PORTS $ENVS"
 
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
@@ -71,7 +71,6 @@ jobs:
           echo "Commands: ${{ steps.load_json.outputs.commands }}"
           echo "Extra args: ${{ inputs.extra_args }}"
 
-      # Start SSH agent
       - name: Start ssh-agent
         uses: webfactory/ssh-agent@v0.4.1
         with:
@@ -92,4 +91,4 @@ jobs:
 
           echo "Running docker run with all args..."
           ssh -o StrictHostKeyChecking=no $SERVER \
-            "docker run -d --name \"$TOOL\" $ARGS $EXTRA $IMAGE $COMMANDS"
+            "docker run -d --name \"$TOOL\" $ARGS $EXTRA \"$IMAGE\" $COMMANDS"
