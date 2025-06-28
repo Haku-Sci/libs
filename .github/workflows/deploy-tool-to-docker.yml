@@ -13,8 +13,8 @@ on:
         type: choice
         options:
           - caddy
-          - myservice
-          - otherservice
+          - neo4j
+          - postgresql
       extra_args:
         description: 'Optional additional docker args'
         required: false
