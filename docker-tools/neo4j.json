@@ -1,5 +1,4 @@
 [
-  "neo4j",
   "neo4j:latest",
   "--env NEO4J_ACCEPT_LICENSE_AGREEMENT=yes",
   "--env NEO4J_dbms_connector_bolt_advertised__address=:7687",
