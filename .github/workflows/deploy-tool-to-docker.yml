@@ -76,21 +76,36 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Deploy via SSH
+      - name: Load tool JSON args
+        id: load_json
         run: |
-          SERVER="-p ${{ vars.SSH_PORT }} ${{ vars.SSH_USER }}@${{ inputs.target-server }}"
           TOOL="${{ inputs.tool }}"
-          IMAGE="${{ steps.load_json.outputs.image }}"
-          ARGS="${{ steps.load_json.outputs.docker_args }}"
-          EXTRA="${{ inputs.extra_args }}"
-          COMMANDS="${{ steps.load_json.outputs.commands }}"
+          FILE="docker-tools/${TOOL}.json"
+          if [ ! -f "$FILE" ]; then
+            echo "::error::File not found: $FILE"
+            exit 1
+          fi
 
-          echo "Connecting to $SERVER..."
-          ssh -o StrictHostKeyChecking=no $SERVER \
-            "if docker ps -a --format '{{.Names}}' | grep -qw \"$TOOL\"; then \
-              docker rm -f \"$TOOL\"; \
-            fi"
+          # Retrieve image (always present)
+          IMAGE=$(jq -r '.image' "$FILE")
 
-          echo "Running docker run with all args..."
-          ssh -o StrictHostKeyChecking=no $SERVER \
-            "docker run -d --name \"$TOOL\" $ARGS $EXTRA \"$IMAGE\" $COMMANDS"
+          # Retrieve options array or empty
+          OPTIONS=$(jq -r '.options // [] | .[]' "$FILE" | paste -sd ' ' -)
+
+          # Retrieve ports mapping or empty
+          PORTS=$(jq -r '.ports // {} | to_entries[] | "-p \(.key):\(.value)"' "$FILE" | paste -sd ' ' -)
+
+          # Retrieve env or empty, wrapping each value in single quotes
+          ENVS=$(jq -r '.env // {} | to_entries[] |
+            "--env \(.key)=\'\(.value|gsub("\'"; "\\\""))\'"' "$FILE" \
+            | paste -sd ' ' -)
+
+          # Retrieve commands array or empty
+          COMMANDS=$(jq -r '.commands // [] | .[]' "$FILE")
+
+          # Combine Docker arguments and trim extra spaces
+          DOCKER_ARGS=$(printf "%s %s %s" "$OPTIONS" "$PORTS" "$ENVS" | xargs)
+
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "docker_args=$DOCKER_ARGS" >> "$GITHUB_OUTPUT"
+          echo "commands=$COMMANDS" >> "$GITHUB_OUTPUT"
