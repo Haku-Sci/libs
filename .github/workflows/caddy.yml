@@ -24,7 +24,10 @@ jobs:
 
       - name: Copy templated Caddyfile to remote
         run: |
-          scp -P ${{ vars.SSH_PORT }} Caddyfile ${{ vars.SSH_USER }}@${{ env.SSH_HOST }}:/tmp/Caddyfile
+          scp -P ${{ vars.SSH_PORT }} \
+          -o StrictHostKeyChecking=no \
+          Caddyfile \
+          ${{ vars.SSH_USER }}@${{ env.SSH_HOST }}:/tmp/Caddyfile
 
       - name: Deploy Caddy container via SSH
         run: |
