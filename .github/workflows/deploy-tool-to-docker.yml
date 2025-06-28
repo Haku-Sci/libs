@@ -87,7 +87,9 @@ jobs:
 
           echo "Connecting to $SERVER..."
           ssh -o StrictHostKeyChecking=no $SERVER \
-            "docker rm -f \"$TOOL\" || true"
+            "if docker ps -a --format '{{.Names}}' | grep -qw \"$TOOL\"; then \
+              docker rm -f \"$TOOL\"; \
+            fi"
 
           echo "Running docker run with all args..."
           ssh -o StrictHostKeyChecking=no $SERVER \
