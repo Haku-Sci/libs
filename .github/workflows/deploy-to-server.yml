@@ -79,12 +79,25 @@ jobs:
       
           echo "env_run=$ENV_RUN" >> "$GITHUB_OUTPUT"
       
-      - name: Deploy via docker-compose or docker run
+      - name: Deploy app via SSH
         run: |
-            ssh -o StrictHostKeyChecking=no -p ${{ vars.SSH_PORT }} ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} \
-              "docker rm -f app || true \
-              && docker run -d --name app \
-              $( [ -n '${{ vars.DOCKER_NETWORK }}' ] && echo \"--network ${{ vars.DOCKER_NETWORK }}\" ) \
-              ${{ steps.set_redirectports.outputs.redirected_ports }} \ 
-              ${{ steps.set_env_vars.outputs.env_run }} ${{ github.repository }}:latest"
-          
+          ssh -o StrictHostKeyChecking=no -p ${{ vars.SSH_PORT }} \
+              ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} bash << 'EOF'
+            # 1) Remove the old container if it exists
+            docker rm -f app || true
+
+            # 2) Create the Docker network (if specified) and build the --network argument
+            NETWORK_ARG=""
+            if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
+              echo "Creating (or verifying) network '${{ vars.DOCKER_NETWORK }}'..."
+              docker network create "${{ vars.DOCKER_NETWORK }}" || true
+              NETWORK_ARG="--network ${{ vars.DOCKER_NETWORK }}"
+            fi
+
+            # 3) Launch the new container, injecting the network and port/env settings
+            docker run -d --name app \
+              $NETWORK_ARG \
+              ${{ steps.set_redirectports.outputs.redirected_ports }} \
+              ${{ steps.set_env_vars.outputs.env_run }} \
+              ${{ github.repository }}:latest
+          EOF
