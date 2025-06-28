@@ -6,7 +6,7 @@ export async function createDatabaseIfNotExists() {
     port: process.env[process.env.ENV_POSTGRESQL_PORT],
     user: process.env[process.env.ENV_POSTGRESQL_USER],
     password: process.env[process.env.ENV_POSTGRESQL_PASSWORD],
-    database: process.env[process.env.ENV_POSTGRESQL_DB], // Connect to the default 'postgres' database
+    database: "postgres", // Connect to the default 'postgres' database
   });
 
   try {
