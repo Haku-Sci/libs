@@ -1,7 +1,7 @@
 name: Deploy Caddy via SSH with templated Caddyfile
 
 on:
-  workflow_dispatch:
+  workflow_call:
 
 jobs:
   deploy-caddy:
