@@ -40,8 +40,7 @@ jobs:
             exit 1
           fi
 
-          ARGS=$(jq -r '.[]' "$FILE")
-          ARGS_JOINED=$(echo "$ARGS" | xargs)
+          ARGS_JOINED=$(jq -r '.[]' "$FILE" | paste -sd ' ' -)
 
           echo "docker_args=$ARGS_JOINED" >> "$GITHUB_OUTPUT"
           echo "loaded_tool_json<<EOF" >> "$GITHUB_OUTPUT"
