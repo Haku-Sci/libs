@@ -49,8 +49,10 @@ jobs:
           # Retrieve ports mapping or empty
           PORTS=$(jq -r '.ports // {} | to_entries[] | "-p \(.key):\(.value)"' "$FILE" | paste -sd ' ' -)
 
-          # Retrieve environment variables or empty, quoting values
-          ENVS=$(jq -r '.env // {} | to_entries[] | "--env \(.key)=\"\(.value)\""' "$FILE" | paste -sd ' ' -)
+          # Retrieve env or empty, wrapping each value in single quotes
+          ENVS=$(jq -r '.env // {} | to_entries[] |
+            "--env \(.key)=\'\(.value|gsub("\'"; "\\\""))\'"' "$FILE" \
+            | paste -sd ' ' -)
 
           # Retrieve commands array or empty
           COMMANDS=$(jq -r '.commands // [] | .[]' "$FILE")
@@ -75,40 +77,6 @@ jobs:
         uses: webfactory/ssh-agent@v0.4.1
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Load tool JSON args
-        id: load_json
-        run: |
-          TOOL="${{ inputs.tool }}"
-          FILE="docker-tools/${TOOL}.json"
-          if [ ! -f "$FILE" ]; then
-            echo "::error::File not found: $FILE"
-            exit 1
-          fi
-
-          # Retrieve image (always present)
-          IMAGE=$(jq -r '.image' "$FILE")
-
-          # Retrieve options array or empty
-          OPTIONS=$(jq -r '.options // [] | .[]' "$FILE" | paste -sd ' ' -)
-
-          # Retrieve ports mapping or empty
-          PORTS=$(jq -r '.ports // {} | to_entries[] | "-p \(.key):\(.value)"' "$FILE" | paste -sd ' ' -)
-
-          # Retrieve env or empty, wrapping each value in single quotes
-          ENVS=$(jq -r '.env // {} | to_entries[] |
-            "--env \(.key)=\'\(.value|gsub("\'"; "\\\""))\'"' "$FILE" \
-            | paste -sd ' ' -)
-
-          # Retrieve commands array or empty
-          COMMANDS=$(jq -r '.commands // [] | .[]' "$FILE")
-
-          # Combine Docker arguments and trim extra spaces
-          DOCKER_ARGS=$(printf "%s %s %s" "$OPTIONS" "$PORTS" "$ENVS" | xargs)
-
-          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
-          echo "docker_args=$DOCKER_ARGS" >> "$GITHUB_OUTPUT"
-          echo "commands=$COMMANDS" >> "$GITHUB_OUTPUT"
 
       - name: Deploy via SSH
         run: |
