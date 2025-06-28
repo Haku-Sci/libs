@@ -97,4 +97,4 @@ jobs:
 
           echo "Running docker run with all args..."
           ssh -o StrictHostKeyChecking=no $SERVER \
-            "docker run -d --name \"$TOOL\" $ARGS $EXTRA \"$IMAGE\" $COMMANDS"
+            "docker run -d --name \"$TOOL\" $ARGS \"$IMAGE\" $COMMANDS $EXTRA"
