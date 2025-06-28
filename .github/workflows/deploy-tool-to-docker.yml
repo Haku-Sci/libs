@@ -50,9 +50,11 @@ jobs:
           PORTS=$(jq -r '.ports // {} | to_entries[] | "-p \(.key):\(.value)"' "$FILE" | paste -sd ' ' -)
 
           # Retrieve env or empty, wrapping each value in single quotes
-          ENVS=$(jq -r '.env // {} | to_entries[] |
-            "--env \(.key)=\'\(.value|gsub("\'"; "\\\""))\'"' "$FILE" \
-            | paste -sd ' ' -)
+          ENVS=""
+          jq -r '.env // {} | to_entries[] | "\(.key)\u0000\(.value)"' "$FILE" \
+            | while IFS=$'\u0000' read -r key value; do
+                ENVS+=" --env $key='$value'"
+              done
 
           # Retrieve commands array or empty
           COMMANDS=$(jq -r '.commands // [] | .[]' "$FILE")
