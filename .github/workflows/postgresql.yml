@@ -7,8 +7,8 @@ jobs:
   deploy-postgres:
     runs-on: ubuntu-latest
     env:
-      POSTGRES_ADMIN: ${{ vars.POSTGRES_ADMIN }}
-      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_ADMIN: ${{ vars.POSTGRESQL_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRESQL_PASSWORD }}
       DB_NAME: ${{ github.event.repository.name }}
     steps:
       - name: Start SSH agent
