@@ -76,7 +76,7 @@ jobs:
             value_escaped=$(printf '%s' "$value" | sed 's/"/\\"/g')
             ENV_RUN+=" -e $key=\"$value_escaped\""
           done
-          ENV_RUN+=" -e SERVICE_PUBLIC_HOSTNAME={{vars.SSH_HOST}}"  # set port for external view
+          ENV_RUN+=" -e SERVICE_PUBLIC_HOSTNAME=${{ vars.SSH_HOST }}"  # set port for external view
           echo "env_run=$ENV_RUN" >> "$GITHUB_OUTPUT"
       
       - name: Deploy app via SSH
