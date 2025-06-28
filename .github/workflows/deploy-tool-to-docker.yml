@@ -109,3 +109,22 @@ jobs:
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
           echo "docker_args=$DOCKER_ARGS" >> "$GITHUB_OUTPUT"
           echo "commands=$COMMANDS" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy via SSH
+        run: |
+          SERVER="-p ${{ vars.SSH_PORT }} ${{ vars.SSH_USER }}@${{ inputs.target-server }}"
+          TOOL="${{ inputs.tool }}"
+          IMAGE="${{ steps.load_json.outputs.image }}"
+          ARGS="${{ steps.load_json.outputs.docker_args }}"
+          EXTRA="${{ inputs.extra_args }}"
+          COMMANDS="${{ steps.load_json.outputs.commands }}"
+
+          echo "Connecting to $SERVER..."
+          ssh -o StrictHostKeyChecking=no $SERVER \
+            "if docker ps -a --format '{{.Names}}' | grep -qw \"$TOOL\"; then \
+               docker rm -f \"$TOOL\" 2>/dev/null; \
+             fi"
+
+          echo "Running docker run with all args..."
+          ssh -o StrictHostKeyChecking=no $SERVER \
+            "docker run -d --name \"$TOOL\" $ARGS $EXTRA \"$IMAGE\" $COMMANDS"
