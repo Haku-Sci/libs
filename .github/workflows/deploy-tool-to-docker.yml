@@ -49,14 +49,14 @@ jobs:
           # Retrieve ports mapping or empty
           PORTS=$(jq -r '.ports // {} | to_entries[] | "-p \(.key):\(.value)"' "$FILE" | paste -sd ' ' -)
 
-          # Retrieve environment variables or empty
-          ENVS=$(jq -r '.env // {} | to_entries[] | "--env \(.key)=\(.value)"' "$FILE" | paste -sd ' ' -)
+          # Retrieve environment variables or empty, quoting values
+          ENVS=$(jq -r '.env // {} | to_entries[] | "--env \(.key)=\"\(.value)\""' "$FILE" | paste -sd ' ' -)
 
           # Retrieve commands array or empty
           COMMANDS=$(jq -r '.commands // [] | .[]' "$FILE")
 
-          # Combine Docker arguments
-          DOCKER_ARGS="$OPTIONS $PORTS $ENVS"
+          # Combine Docker arguments and trim extra spaces
+          DOCKER_ARGS=$(printf "%s %s %s" "$OPTIONS" "$PORTS" "$ENVS" | xargs)
 
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
           echo "docker_args=$DOCKER_ARGS" >> "$GITHUB_OUTPUT"
