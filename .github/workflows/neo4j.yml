@@ -39,5 +39,5 @@ jobs:
 
       - name: Show Neo4j status on server
         run: |
-          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ env.SSH_HOST }} \
+          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} \
             "docker ps --filter name=neo4j --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
