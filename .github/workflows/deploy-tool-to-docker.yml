@@ -40,18 +40,35 @@ jobs:
             exit 1
           fi
 
-          ARGS_JOINED=$(jq -r '.[]' "$FILE" | paste -sd ' ' -)
+          # Parse image
+          IMAGE=$(jq -r '.image' "$FILE")
 
-          echo "docker_args=$ARGS_JOINED" >> "$GITHUB_OUTPUT"
-          echo "loaded_tool_json<<EOF" >> "$GITHUB_OUTPUT"
-          cat "$FILE" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          # Parse options (array)
+          OPTIONS=$(jq -r '.options[]?' "$FILE" | paste -sd ' ' -)
+
+          # Parse ports
+          PORTS=$(jq -r '.ports | to_entries[] | "-p \(.key):\(.value)"' "$FILE" | paste -sd ' ' -)
+
+          # Parse env
+          ENVS=$(jq -r '.env | to_entries[] | "--env \(.key)=\(.value)"' "$FILE" | paste -sd ' ' -)
+
+          # Parse commands
+          COMMANDS=$(jq -r '.commands[]?' "$FILE")
+
+          # Combine all
+          DOCKER_ARGS="$OPTIONS $PORTS $ENVS"
+
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "docker_args=$DOCKER_ARGS" >> "$GITHUB_OUTPUT"
+          echo "commands=$COMMANDS" >> "$GITHUB_OUTPUT"
 
       - name: Debug show values
         run: |
           echo "Target server: ${{ inputs.target-server }}"
           echo "Tool: ${{ inputs.tool }}"
-          echo "Tool args: ${{ steps.load_json.outputs.docker_args }}"
+          echo "Image: ${{ steps.load_json.outputs.image }}"
+          echo "Docker args: ${{ steps.load_json.outputs.docker_args }}"
+          echo "Commands: ${{ steps.load_json.outputs.commands }}"
           echo "Extra args: ${{ inputs.extra_args }}"
 
       # Start SSH agent
@@ -64,8 +81,10 @@ jobs:
         run: |
           SERVER="-p ${{ vars.SSH_PORT }} ${{ vars.SSH_USER }}@${{ inputs.target-server }}"
           TOOL="${{ inputs.tool }}"
+          IMAGE="${{ steps.load_json.outputs.image }}"
           ARGS="${{ steps.load_json.outputs.docker_args }}"
           EXTRA="${{ inputs.extra_args }}"
+          COMMANDS="${{ steps.load_json.outputs.commands }}"
 
           echo "Connecting to $SERVER..."
           ssh -o StrictHostKeyChecking=no $SERVER \
@@ -73,4 +92,4 @@ jobs:
 
           echo "Running docker run with all args..."
           ssh -o StrictHostKeyChecking=no $SERVER \
-            "docker run -d --name \"$TOOL\" $ARGS $EXTRA"
+            "docker run -d --name \"$TOOL\" $ARGS $EXTRA $IMAGE $COMMANDS"

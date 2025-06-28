@@ -1,6 +1,8 @@
-[
-  "-p 80:80",
-  "-p 443:443",
-  "caddy:2-alpine",
-  "caddy"
-]
+{
+  "options":[],
+  "image":"caddy:2-alpine",
+  "port":{
+    "80":"80",
+    "443":"443"
+  }
+}
