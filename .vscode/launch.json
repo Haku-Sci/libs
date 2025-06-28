@@ -13,7 +13,8 @@
             "envFile":"${workspaceFolder}/../libs/.env",
             "env":{
                 "PORT":"443",
-                "HOST":"127.43.0.0"
+                "HOST":"127.43.0.0",
+                "API_URL":"https://api.haku-sci.com",
             },
         },
         //Api
@@ -64,6 +65,16 @@
                 "SUPER_ADMIN_LOGIN":"SuperAdmin@haku-sci.com"
             }
         },
+
+        //Compile Neo4j plugin
+        {
+            "name": "compile",
+            "type": "PowerShell",
+            "request": "launch",
+            "script": "mvn clean package",
+            "cwd": "${workspaceFolder}/graph/plugins"
+        },
+
         //Data-processing
         {
             "name": "Data-processing",
