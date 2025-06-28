@@ -24,15 +24,22 @@ jobs:
             exit 1
           fi
 
+          NETWORK_ARG=""
+          if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
+            docker network create "${{ vars.DOCKER_NETWORK }}" || true
+            NETWORK_ARG="--network ${{ vars.DOCKER_NETWORK }}"
+          fi
+
           ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} bash << 'EOF'
             if docker ps -a --format '{{.Names}}' | grep -qw "neo4j"; then
               docker rm -f neo4j || true
             fi
 
             mkdir -p /opt/neo4j/data
-
+            docker network create neo4j-network
             docker run -d \
               --name neo4j \
+              $NETWORK_ARG \
               -p 7474:7474 -p 7687:7687 \
               -v /opt/neo4j/data:/data \
               --env NEO4J_AUTH=neo4j/${{ env.NEO4J_PASSWORD }} \

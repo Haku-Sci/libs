@@ -82,5 +82,9 @@ jobs:
       - name: Deploy via docker-compose or docker run
         run: |
             ssh -o StrictHostKeyChecking=no -p ${{ vars.SSH_PORT }} ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} \
-              "docker rm -f app || true && docker run -d --name app ${{ steps.set_redirectports.outputs.redirected_ports }}${{ steps.set_env_vars.outputs.env_run }} ${{ github.repository }}:latest"
+              "docker rm -f app || true \
+              && docker run -d --name app \
+              $( [ -n '${{ vars.DOCKER_NETWORK }}' ] && echo \"--network ${{ vars.DOCKER_NETWORK }}\" ) \
+              ${{ steps.set_redirectports.outputs.redirected_ports }} \ 
+              ${{ steps.set_env_vars.outputs.env_run }} ${{ github.repository }}:latest"
           
