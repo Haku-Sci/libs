@@ -35,7 +35,7 @@ jobs:
               --name neo4j \
               -p 7474:7474 -p 7687:7687 \
               -v /opt/neo4j/data:/data \
-              --env NEO4J_AUTH=neo4j/${NEO4J_PASSWORD} \
+              --env NEO4J_AUTH=neo4j/${{ env.NEO4J_PASSWORD }} \
               neo4j:latest
           EOF
 
