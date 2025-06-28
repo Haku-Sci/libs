@@ -19,16 +19,18 @@ jobs:
 
       - name: Deploy Neo4j container via SSH
         run: |
+          if [ -z "${{ env.NEO4J_PASSWORD }}" ]; then
+            echo "::error::NEO4J_PASSWORD is empty. Aborting deployment."
+            exit 1
+          fi
+
           ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} bash << 'EOF'
-            # Stop & remove existing container
             if docker ps -a --format '{{.Names}}' | grep -qw "neo4j"; then
               docker rm -f neo4j || true
             fi
 
-            # Ensure data directory exists
             mkdir -p /opt/neo4j/data
 
-            # Run Neo4j container with the password from secret
             docker run -d \
               --name neo4j \
               -p 7474:7474 -p 7687:7687 \
