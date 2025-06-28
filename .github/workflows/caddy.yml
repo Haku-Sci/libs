@@ -10,11 +10,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Template Caddyfile
-        run: |
-          # Replace placeholder in Caddyfile using envsubst
-          envsubst < Caddyfile.template > Caddyfile
-
       - name: Start ssh-agent
         uses: webfactory/ssh-agent@v0.4.1
         with:
