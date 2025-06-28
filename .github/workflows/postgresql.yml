@@ -1,0 +1,44 @@
+name: Deploy PostgreSQL via SSH
+
+on:
+  workflow_call:
+
+jobs:
+  deploy-postgres:
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_ADMIN: ${{ vars.POSTGRES_ADMIN }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      DB_NAME: ${{ github.event.repository.name }}
+    steps:
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.4.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy PostgreSQL container via SSH
+        run: |
+          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} bash << 'EOF'
+            # Stop & remove existing container
+            if docker ps -a --format '{{.Names}}' | grep -qw "postgres"; then
+              docker rm -f postgres || true
+            fi
+
+            # Ensure data directory exists
+            mkdir -p /opt/postgres/data
+
+            # Run PostgreSQL container with admin user/password and database
+            docker run -d \
+              --name postgres \
+              -p 5432:5432 \
+              -v /opt/postgres/data:/var/lib/postgresql/data \
+              -e POSTGRES_USER="${POSTGRES_ADMIN}" \
+              -e POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
+              -e POSTGRES_DB="${DB_NAME}" \
+              postgres:latest
+          EOF
+
+      - name: Show PostgreSQL status on server
+        run: |
+          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} \
+            "docker ps --filter name=postgres --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"

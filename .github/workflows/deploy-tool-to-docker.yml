@@ -1,24 +1,7 @@
 name: Set docker tool to run on remote server
 
 on:
-  workflow_dispatch:
-    inputs:
-      target-server:
-        description: 'Target SSH server (user@host:port)'
-        required: true
-        type: string
-      tool:
-        description: 'Docker tool to run (must match a JSON file in docker-tools/)'
-        required: true
-        type: choice
-        options:
-          - caddy
-          - neo4j
-          - postgresql
-      extra_args:
-        description: 'Optional additional docker args'
-        required: false
-        type: string
+  workflow_call:
 
 jobs:
   run-tool:

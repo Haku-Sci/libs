@@ -1,0 +1,43 @@
+name: Deploy Caddy via SSH with templated Caddyfile
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-caddy:
+    runs-on: ubuntu-latest
+    env:
+      SSH_HOST: ${{ vars.SSH_HOST }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Template Caddyfile
+        run: |
+          # Replace placeholder in Caddyfile using envsubst
+          envsubst < Caddyfile.template > Caddyfile
+
+      - name: Start ssh-agent
+        uses: webfactory/ssh-agent@v0.4.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Copy templated Caddyfile to remote
+        run: |
+          scp -P ${{ vars.SSH_PORT }} Caddyfile ${{ vars.SSH_USER }}@${{ env.SSH_HOST }}:/tmp/Caddyfile
+
+      - name: Deploy Caddy container via SSH
+        run: |
+          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ env.SSH_HOST }} bash << 'EOF'
+            if docker ps -a --format '{{.Names}}' | grep -qw "caddy"; then
+              docker rm -f caddy
+            fi
+            mkdir -p /opt/caddy/config /opt/caddy/data
+            mv /tmp/Caddyfile /opt/caddy/config/Caddyfile
+            docker run -d \
+              --name caddy \
+              -p 80:80 -p 443:443 \
+              -v /opt/caddy/config/Caddyfile:/etc/caddy/Caddyfile:ro \
+              -v /opt/caddy/data:/data \
+              caddy:2-alpine
+          EOF

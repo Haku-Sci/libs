@@ -1,0 +1,40 @@
+name: Deploy Neo4j via SSH
+
+on:
+  workflow_call:
+
+jobs:
+  deploy-neo4j:
+    runs-on: ubuntu-latest
+    env:
+      NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+    steps:
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.4.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy Neo4j container via SSH
+        run: |
+          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} bash << 'EOF'
+            # Stop & remove existing container
+            if docker ps -a --format '{{.Names}}' | grep -qw "neo4j"; then
+              docker rm -f neo4j || true
+            fi
+
+            # Ensure data directory exists
+            mkdir -p /opt/neo4j/data
+
+            # Run Neo4j container with the password from secret
+            docker run -d \
+              --name neo4j \
+              -p 7474:7474 -p 7687:7687 \
+              -v /opt/neo4j/data:/data \
+              --env NEO4J_AUTH=neo4j/${NEO4J_PASSWORD} \
+              neo4j:latest
+          EOF
+
+      - name: Show Neo4j status on server
+        run: |
+          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ env.SSH_HOST }} \
+            "docker ps --filter name=neo4j --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
