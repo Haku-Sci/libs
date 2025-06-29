@@ -24,13 +24,13 @@ jobs:
             exit 1
           fi
 
-          NETWORK_ARG=""
-          if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
-            docker network create "${{ vars.DOCKER_NETWORK }}" || true
-            NETWORK_ARG="--network ${{ vars.DOCKER_NETWORK }}"
-          fi
-
           ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} bash << 'EOF'
+            NETWORK_ARG=""
+            if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
+              docker network create "${{ vars.DOCKER_NETWORK }}" || true
+              NETWORK_ARG="--network ${{ vars.DOCKER_NETWORK }}"
+            fi
+          
             if docker ps -a --format '{{.Names}}' | grep -qw "neo4j"; then
               docker rm -f neo4j || true
             fi
