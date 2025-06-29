@@ -33,6 +33,10 @@ jobs:
               NETWORK_ARG="--network ${{ vars.DOCKER_NETWORK }}"
             fi
 
+            if docker ps -a --format '{{.Names}}' | grep -qw "postgresql"; then
+              docker rm -f postgresql || true
+            fi
+
             # Run PostgreSQL container with admin user/password and database
             docker run -d \
               --name postgresql \
