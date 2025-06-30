@@ -54,11 +54,12 @@ jobs:
 
             echo "PostgreSQL container starting with name 'postgresql'."
             # Wait for PostgreSQL to be ready
-            until docker logs postgresql 2>&1 | grep -E -q 'ready|[Ee]rror'; do
-              sleep 1
+            until docker logs postgresql 2>&1 | { grep -E -qi 'ready' && exit 0; grep -E -qi 'error' && exit 1; false; }; 
+              do sleep 1; 
             done
+
             echo "PostgreSQL container started"
-            
+
             # Set the password for the admin user
             docker exec -i postgresql psql -U "${{ env.POSTGRES_ADMIN }}" -d "${{ env.DB_NAME }}" << 'SQL'
               ALTER USER "${{ env.POSTGRES_ADMIN }}" WITH PASSWORD '${{ env.POSTGRES_PASSWORD }}';
