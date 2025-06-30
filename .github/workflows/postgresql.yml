@@ -29,7 +29,10 @@ jobs:
 
             NETWORK_ARG=""
             if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
-              docker network create "${{ vars.DOCKER_NETWORK }}" || true
+              if ! docker network inspect "${{ vars.DOCKER_NETWORK }}" > /dev/null 2>&1; then
+                echo "Create Docker network: ${{ vars.DOCKER_NETWORK }}"
+                docker network create "${{ vars.DOCKER_NETWORK }}" || true
+              fi
               NETWORK_ARG="--network ${{ vars.DOCKER_NETWORK }}"
             fi
 
