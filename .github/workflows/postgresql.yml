@@ -55,19 +55,20 @@ jobs:
             if [ $RC -ne 0 ]; then
               docker logs postgresql || true
               exit $RC
-            fi
-            echo "PostgreSQL container starting with name 'postgresql'."
-            # Wait for PostgreSQL to be ready
-            until docker logs postgresql 2>&1 | { grep -E -qi 'ready' && exit 0; false; }; 
-              do sleep 1; 
-            done
+            else
+              echo "PostgreSQL container starting with name 'postgresql'."
+              # Wait for PostgreSQL to be ready
+              until docker logs postgresql 2>&1 | { grep -E -qi 'ready' && exit 0; false; }; 
+                do sleep 1; 
+              done
 
-            echo "PostgreSQL container started"
+              echo "PostgreSQL container started"
 
-            # Set the password for the admin user
-            docker exec -i postgresql psql -U "${{ env.POSTGRES_ADMIN }}" -d "${{ env.DB_NAME }}" << 'SQL'
-              ALTER USER "${{ env.POSTGRES_ADMIN }}" WITH PASSWORD '${{ env.POSTGRES_PASSWORD }}';
+              # Set the password for the admin user
+              docker exec -i postgresql psql -U "${{ env.POSTGRES_ADMIN }}" -d "${{ env.DB_NAME }}" << 'SQL'
+                ALTER USER "${{ env.POSTGRES_ADMIN }}" WITH PASSWORD '${{ env.POSTGRES_PASSWORD }}';
           SQL
+          fi
           EOF
 
       - name: Show PostgreSQL status on server
