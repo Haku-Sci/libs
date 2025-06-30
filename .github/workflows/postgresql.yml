@@ -30,9 +30,12 @@ jobs:
             NETWORK_ARG=""
             if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
               if docker network inspect "${{ vars.DOCKER_NETWORK }}" > /dev/null 2>&1; then
-                docker network disconnect -f "${{ vars.DOCKER_NETWORK }}" postgresql || true
+                for ct in $(docker network inspect -f '{{range .Containers}}{{.Name}} {{end}}' "${{ vars.DOCKER_NETWORK }}"); do
+                  docker network disconnect -f "${{ vars.DOCKER_NETWORK }}" "$ct" || true
+                done
+                docker network rm "${{ vars.DOCKER_NETWORK }}" || true
               fi
-              echo "Create Docker network: ${{ vars.DOCKER_NETWORK }}"
+
               docker network create "${{ vars.DOCKER_NETWORK }}" || true
               NETWORK_ARG="--network ${{ vars.DOCKER_NETWORK }}"
             fi
