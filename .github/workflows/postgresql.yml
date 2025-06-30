@@ -34,6 +34,7 @@ jobs:
             fi
 
             if docker ps -a --format '{{.Names}}' | grep -qw "postgresql"; then
+              echo "deleting existing PostgreSQL container" 
               docker rm -f postgresql || true
             fi
 
