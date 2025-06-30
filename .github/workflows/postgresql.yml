@@ -57,7 +57,7 @@ jobs:
               sleep 1
             done
 
-            docker exec -i postgresql psql -U "${{ env.POSTGRES_ADMIN }}" << 'SQL'
+            docker exec -i postgresql psql -U "${{ env.POSTGRES_ADMIN }}" -d "${{ env.DB_NAME }}" << 'SQL'
               ALTER USER "${{ env.POSTGRES_ADMIN }}" WITH PASSWORD '${{ env.POSTGRES_PASSWORD }}';
           SQL
           EOF
