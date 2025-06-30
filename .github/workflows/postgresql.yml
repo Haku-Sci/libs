@@ -52,9 +52,9 @@ jobs:
               -e POSTGRES_DB="${{ env.DB_NAME }}" \
               postgres:latest
 
-              docker exec -it postgresql psql -U postgres << 'SQL'
+              docker exec -i postgresql psql -U ${{ env.POSTGRES_ADMIN }} << 'EOF2'
                 ALTER USER "${{ env.POSTGRES_ADMIN }}" WITH PASSWORD '${{ env.POSTGRES_PASSWORD }}';
-              SQL
+              EOF2
           EOF
 
       - name: Show PostgreSQL status on server
