@@ -47,9 +47,9 @@ jobs:
               $NETWORK_ARG \
               -p 5432:5432 \
               -v /opt/postgres/data:/var/lib/postgresql/data \
-              -e POSTGRES_USER="${POSTGRES_ADMIN}" \
-              -e POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
-              -e POSTGRES_DB="${DB_NAME}" \
+              -e POSTGRES_USER="${{ env.POSTGRES_ADMIN }}" \
+              -e POSTGRES_PASSWORD="${{ env.POSTGRES_PASSWORD }}" \
+              -e POSTGRES_DB="${{ env.DB_NAME }}" \
               postgres:latest
             RC=$?
             if [ $RC -ne 0 ]; then
