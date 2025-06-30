@@ -47,14 +47,18 @@ jobs:
               $NETWORK_ARG \
               -p 5432:5432 \
               -v /opt/postgres/data:/var/lib/postgresql/data \
-              -e POSTGRES_USER="${{ env.POSTGRES_ADMIN }}" \
-              -e POSTGRES_PASSWORD="${{ env.POSTGRES_PASSWORD }}" \
-              -e POSTGRES_DB="${{ env.DB_NAME }}" \
+              -e POSTGRES_USER="${POSTGRES_ADMIN}" \
+              -e POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
+              -e POSTGRES_DB="${DB_NAME}" \
               postgres:latest
-
+            RC=$?
+            if [ $RC -ne 0 ]; then
+              docker logs postgresql || true
+              exit $RC
+            fi
             echo "PostgreSQL container starting with name 'postgresql'."
             # Wait for PostgreSQL to be ready
-            until docker logs postgresql 2>&1 | { grep -E -qi 'ready' && exit 0; grep -E -qi 'error' && exit 1; false; }; 
+            until docker logs postgresql 2>&1 | { grep -E -qi 'ready' && exit 0; false; }; 
               do sleep 1; 
             done
 
