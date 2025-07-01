@@ -16,7 +16,7 @@ jobs:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Add SSH host key
-        run: ssh-keyscan ${{ vars.SSH_HOST }} >> ~/.ssh/known_hosts
+        run: ssh-keyscan "${{ vars.SSH_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Deploy Neo4j container via SSH
         run: |
@@ -25,18 +25,44 @@ jobs:
             exit 1
           fi
 
-          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} bash << 'EOF'
-            # If the container already exists, only update the password
+          ssh -p "${{ vars.SSH_PORT }}" -o StrictHostKeyChecking=no "${{ vars.SSH_USER }}"@"${{ vars.SSH_HOST }}" bash << 'EOF'
             if docker ps -a --format '{{.Names}}' | grep -qw "neo4j"; then
-              echo "Neo4j container exists — updating initial password"
-              docker exec neo4j bin/neo4j-admin dbms set-initial-password "${{ env.NEO4J_PASSWORD }}"
+              echo "Neo4j container exists — forcing password reset"
+
+              # Stop container
+              docker stop neo4j || true
+
+              # Mount config and disable auth
+              docker run --rm \
+                -v neo4j_home:/var/lib/neo4j \
+                neo4j:latest sh -c "echo 'dbms.security.auth_enabled=false' >> /var/lib/neo4j/conf/neo4j.conf"
+
+              # Restart container with disabled auth
+              docker start neo4j
+
+              # Wait for DB to start
+              until docker logs neo4j 2>&1 | grep -q "Bolt enabled"; do sleep 1; done
+
+              # Change password directly via cypher-shell
+              docker exec neo4j bin/cypher-shell -u neo4j -d system \
+                "ALTER USER neo4j SET PASSWORD '${{ vars.NEO4J_PASSWORD }}';"
+
+              # Stop container again
+              docker stop neo4j
+
+              # Re-enable auth
+              docker run --rm \
+                -v neo4j_home:/var/lib/neo4j \
+                neo4j:latest sh -c "sed -i '/dbms.security.auth_enabled=false/d' /var/lib/neo4j/conf/neo4j.conf"
+
+              # Start normally
+              docker start neo4j
             else
-              # Deploy a new Neo4j container
+              echo "Deploy new Neo4j container"
               NETWORK_ARG=""
               if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
-                if ! docker network inspect "${{ vars.DOCKER_NETWORK }}" > /dev/null 2>&1; then
+                docker network inspect "${{ vars.DOCKER_NETWORK }}" > /dev/null 2>&1 || \
                   docker network create "${{ vars.DOCKER_NETWORK }}"
-                fi
                 NETWORK_ARG="--network ${{ vars.DOCKER_NETWORK }}"
               fi
 
@@ -48,11 +74,10 @@ jobs:
                 -v /opt/neo4j/data:/data \
                 -e NEO4J_AUTH=neo4j/${NEO4J_PASSWORD} \
                 neo4j:latest
-              echo "Deployed new Neo4j container"
             fi
           EOF
 
       - name: Show Neo4j status on server
         run: |
-          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} \
+          ssh -p "${{ vars.SSH_PORT }}" -o StrictHostKeyChecking=no "${{ vars.SSH_USER }}"@"${{ vars.SSH_HOST }}" \
             "docker ps --filter name=neo4j --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
