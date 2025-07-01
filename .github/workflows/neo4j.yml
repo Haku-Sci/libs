@@ -8,6 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+
     steps:
       - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.4.1
@@ -25,31 +26,30 @@ jobs:
           fi
 
           ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} bash << 'EOF'
-            # Stop & remove existing container
+            # If the container already exists, only update the password
             if docker ps -a --format '{{.Names}}' | grep -qw "neo4j"; then
-              echo "Stopping and removing existing Neo4j container"
-              docker rm -f neo4j || true
-            fi
-            
-            NETWORK_ARG=""
-            if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
-              if ! docker network inspect "${{ vars.DOCKER_NETWORK }}" > /dev/null 2>&1; then
-                echo "Create Docker network: ${{ vars.DOCKER_NETWORK }}"
-                docker network create "${{ vars.DOCKER_NETWORK }}" || true
+              echo "Neo4j container exists — updating initial password"
+              docker exec neo4j bin/neo4j-admin dbms set-initial-password "${NEO4J_PASSWORD}"
+            else
+              # Deploy a new Neo4j container
+              NETWORK_ARG=""
+              if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
+                if ! docker network inspect "${{ vars.DOCKER_NETWORK }}" > /dev/null 2>&1; then
+                  docker network create "${{ vars.DOCKER_NETWORK }}"
+                fi
+                NETWORK_ARG="--network ${{ vars.DOCKER_NETWORK }}"
               fi
-              NETWORK_ARG="--network ${{ vars.DOCKER_NETWORK }}"
-            fi
 
-            mkdir -p /opt/neo4j/data
-            docker network create neo4j-network
-            docker run -d \
-              --name neo4j \
-              $NETWORK_ARG \
-              -p 7474:7474 -p 7687:7687 \
-              -v /opt/neo4j/data:/data \
-              --env NEO4J_AUTH=neo4j/${{ env.NEO4J_PASSWORD }} \
-              neo4j:latest
-            echo "Neo4j container starting with name 'neo4j'."
+              mkdir -p /opt/neo4j/data
+              docker run -d \
+                --name neo4j \
+                $NETWORK_ARG \
+                -p 7474:7474 -p 7687:7687 \
+                -v /opt/neo4j/data:/data \
+                -e NEO4J_AUTH=neo4j/${NEO4J_PASSWORD} \
+                neo4j:latest
+              echo "Deployed new Neo4j container"
+            fi
           EOF
 
       - name: Show Neo4j status on server
