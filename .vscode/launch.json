@@ -14,7 +14,8 @@
             "env":{
                 "PORT":"443",
                 "HOST":"127.43.0.0",
-                "API_URL":"https://api.haku-sci.com",
+                //"API_URL":"https://api.haku-sci.com",
+                "API_URL":"http://localhost:80",
             },
         },
         //Api
