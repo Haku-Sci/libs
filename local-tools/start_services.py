@@ -160,18 +160,6 @@ def manage_consul():
             "endCreationLog": "Vault server started!",
             "postprocessCommand": ["vault", "status"]
         }
-    },'''
-services = [    
-    {
-        "name": "postgres",
-        "image": "postgres:latest",
-        "ports": {5432: 5432},
-        "env": {
-            "POSTGRES_USER": "admin",
-            "POSTGRES_PASSWORD": "password",
-            "POSTGRES_DB": "postgres",
-        },
-        "additional_args": [],
     },
     {
         "name": "neo4j",
@@ -184,13 +172,30 @@ services = [
         },
         "additional_args": [],
         "on_load":["cp", f"{str(Path('../neo4j/target/graph-libs-1.0.jar').resolve())}", f"neo4j:/var/lib/neo4j/plugins/graph-libs-1.0.jar"]
-    }
+    },
+    {
+        "name": "postgres",
+        "image": "postgres:latest",
+        "ports": {5432: 5432},
+        "env": {
+            "POSTGRES_USER": "admin",
+            "POSTGRES_PASSWORD": "password",
+            "POSTGRES_DB": "postgres",
+        },
+        "additional_args": [],
+    }'''
+services = [    
+    
 ]
 
 if __name__ == "__main__":
     # Manage Docker services
-    for service in services:
-        manage_docker_service(service)
+    #for service in services:
+    #    manage_docker_service(service)
 
     # Manage Consul
     manage_consul()
+
+    # Run port forward
+    subprocess.run(["ssh", "-N", "-L", "7474:localhost:7474", "-L", "7687:localhost:7687", "graph"], check=True)
+    subprocess.run(["ssh", "-N", "-L", "5432:localhost:5432", "confidential-properties"], check=True)
