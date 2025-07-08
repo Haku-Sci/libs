@@ -135,6 +135,10 @@ def manage_consul():
         time.sleep(2)
         print("Consul started successfully.")
 
+def start_tunnel(cmd):
+    proc = subprocess.Popen(cmd)
+    return proc
+
 # Docker service configurations
 '''
     {
@@ -197,5 +201,21 @@ if __name__ == "__main__":
     manage_consul()
 
     # Run port forward
-    subprocess.run(["ssh", "-N", "-L", "7474:localhost:7474", "-L", "7687:localhost:7687", "graph"], check=True)
-    subprocess.run(["ssh", "-N", "-L", "5432:localhost:5432", "confidential-properties"], check=True)
+    # Run neo4j in background
+    neo_proc = start_tunnel(["ssh", "-N",
+                            "-L", "7474:localhost:7474",
+                            "-L", "7687:localhost:7687",
+                            "graph"])
+    print("Tunnel Neo4j started")
+
+    # Run PostgreSQL for confidential-properties in background
+    pg_proc = start_tunnel(["ssh", "-N",
+                            "-L", "5432:localhost:5432",
+                            "confidential-properties"])
+    print("Tunnel PostgreSQL started")
+
+    # Run PostgreSQL for third-party in background
+    pg_proc = start_tunnel(["ssh", "-N",
+                            "-L", "5432:127.0.0.2:5432",
+                            "third-party"])
+    print("Tunnel PostgreSQL started")
