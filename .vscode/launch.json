@@ -38,7 +38,9 @@
             "type": "node-terminal",
             "envFile":"${workspaceFolder}/../libs/.env",
             "env": {
-                "RDS_DBNAME": "Confidential-properties"
+                "RDS_DBNAME": "confidential-properties",
+                "RDS_HOSTNAME": "localhost",
+                "ENV_POSTGRESQL_PASSWORD":"CONFIDENTIAL_PROPERTIES_PASSWORD"
             }
         },
         //Cron
@@ -62,8 +64,7 @@
             "envFile":"${workspaceFolder}/../libs/.env",
             "env": {
                 "NEO4J_URI":"neo4j://localhost:7687",
-                "NEO4J_USER":"neo4j",
-                "NEO4J_PASSWORD":"password",
+                "NEO4J_USER":"neo4j",                
                 "SUPER_ADMIN_LOGIN":"SuperAdmin@haku-sci.com"
             }
         },
@@ -95,6 +96,8 @@
             "envFile":"${workspaceFolder}/../libs/.env",
             "env":{
                 "RDS_DBNAME":"third-party",
+                "RDS_HOSTNAME": "127.0.0.2",
+                "ENV_POSTGRESQL_PASSWORD":"THIRD_PARTY_PASSWORD",
                 "SMTP_PORT":"587",
                 "FROM_USERNAME":"Haku-Sci",
                 "UNPAYWALL_URL":"https://api.unpaywall.org/v2",
