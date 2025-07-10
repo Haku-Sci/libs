@@ -19,7 +19,6 @@ jobs:
         with:
           buildkitd-flags: |
             --allow-insecure-entitlement network.host
-            --dns=8.8.8.8
           driver-opts: |
             network=host
 

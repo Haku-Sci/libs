@@ -215,7 +215,7 @@ if __name__ == "__main__":
     print("Tunnel PostgreSQL started")
 
     # Run PostgreSQL for third-party in background
-    pg_proc = start_tunnel(["ssh", "-N",
-                            "-L", "5432:127.0.0.2:5432",
-                            "third-party"])
-    print("Tunnel PostgreSQL started")
+    #pg_proc = start_tunnel(["ssh", "-N",
+    #                        "-L", "5432:127.0.0.2:5432",
+    #                        "third-party"])
+    #print("Tunnel PostgreSQL started")
