@@ -32,7 +32,7 @@ export class Consul {
 
     if (serviceInfo.length > 0) {
       const service = serviceInfo[0];
-      const address = service.ServiceAddress || service.Address;
+      const address = process.env.PRIVAT_NETWORK_ADDRESS||service.ServiceAddress || service.Address;
       const port = service.ServicePort;
       return {
         host: address,
