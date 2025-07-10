@@ -11,13 +11,13 @@ import { DiscoveryModule, DiscoveryService } from '@golevelup/nestjs-discovery';
 
 @Injectable()
 export class TCPService {
-    static async sendMessage(service, action: string, resource?: string, payload?): Promise<any> {
+    static async sendMessage(service, action: string, resource?: string, payload={}): Promise<any> {
         const client: ClientProxy = await ClientProxyFactory.create({
             transport: Transport.TCP,
             options: await Consul.getServiceURI(service),
         });
         try {
-            payload.sender = await utils.microServiceName()
+            payload["sender"] = await utils.microServiceName()
             let response$ = await client.send([resource, action].join("/"), payload).pipe(
                 catchError(err => {
                     const status = err?.status || HttpStatus.BAD_REQUEST;
