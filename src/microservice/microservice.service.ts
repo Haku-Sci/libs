@@ -8,7 +8,6 @@ import { AllExceptionsFilter } from './exceptionFilter';
 import * as os from 'os';
 import { Consul } from './consul';
 import { TCPService } from '../TCP/tcp.service';
-import { HttpHealthAppModule } from '../minimal-app/http-health.module';
 
 export class Microservice {
   private static serverAddress: net.AddressInfo = { family: 'IPv4', port: 3000, address: null };
@@ -24,8 +23,6 @@ export class Microservice {
     }
 
     // Start Microservices
-    if(process.env.HTTP_PORT)
-      await(await NestFactory.create(HttpHealthAppModule)).listen(process.env.HTTP_PORT,'0.0.0.0') 
     const app = await this.startTCPMicroService(appModule);
 
     //Handle HakuSciMessagePattern

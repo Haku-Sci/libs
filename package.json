@@ -1,6 +1,6 @@
 {
   "name": "@haku-sci/utils",
-  "version": "2.4.5",
+  "version": "2.5.0",
   "description": "utils from haku-sci. Library only",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
