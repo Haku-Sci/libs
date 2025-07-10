@@ -34,6 +34,7 @@ jobs:
           tags: ${{ github.repository }}:latest
           allow: network.host
           network: host
+          push: true
 
       # Start SSH agent
       - name: Start ssh-agent
