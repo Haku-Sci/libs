@@ -21,8 +21,6 @@ jobs:
             --allow-insecure-entitlement network.host
           driver-opts: |
             network=host
-            mnt=type=bind,source=/etc/resolv.conf,target=/etc/resolv.conf
-            mnt=type=bind,source=/run/systemd/resolve/resolv.conf,target=/run/systemd/resolve/resolv.conf
             
       # Build Docker image
       - name: Build Docker image
