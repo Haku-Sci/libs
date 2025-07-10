@@ -6,7 +6,7 @@ export class Consul {
   static async registerService(serverAddress: net.AddressInfo, logger: Logger) {
     if (!process.env["CONSUL_URL"])
       return;
-    const externalAddress=process.env.SERVICE_PUBLIC_HOSTNAME || serverAddress.address;
+    const externalAddress=process.env.SERVICE_PRIVATE_HOSTNAME||process.env.SERVICE_PUBLIC_HOSTNAME || serverAddress.address;
     const externalPort=parseInt(process.env.SERVICE_PUBLIC_PORT) || serverAddress.port
     const microServiceName = await utils.microServiceName();
     const serviceData = {
@@ -32,7 +32,7 @@ export class Consul {
 
     if (serviceInfo.length > 0) {
       const service = serviceInfo[0];
-      const address = process.env.PRIVAT_NETWORK_ADDRESS||service.ServiceAddress || service.Address;
+      const address = service.ServiceAddress || service.Address;
       const port = service.ServicePort;
       return {
         host: address,
