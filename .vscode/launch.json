@@ -4,6 +4,31 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        //local tools
+        {
+            "name": "[Local Tools] start consul and tunnels",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/../libs/local-tools/start_services.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "[Local Tools] set consul services",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/../libs/local-tools/set-consul-services.py",
+            "justMyCode": true
+        },
+        {
+            "name": "[Local Tools] clean consul services",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/../libs/local-tools/cleanup-consul-services.py",
+            "justMyCode": true
+        },
+
+
         //Front
         {
             "command": "npm run dev-https --prefix ../services/front",
@@ -14,7 +39,19 @@
             "env":{
                 "PORT":"443",
                 "HOST":"127.43.0.0",
-                //"NEXT_PUBLIC_API_URL":"https://api.haku-sci.com",
+                "NEXT_PUBLIC_API_URL":"https://api.haku-sci.com",
+                //"NEXT_PUBLIC_API_URL":"http://localhost:80",
+            },
+        },
+        {
+            "command": "npm run start --prefix ../services/front",
+            "name": "Front (no debug)",
+            "request": "launch",
+            "type": "node-terminal",
+            "envFile":"${workspaceFolder}/../libs/.env",
+            "env":{
+                "PORT":"443",
+                "HOST":"127.43.0.0",
                 "NEXT_PUBLIC_API_URL":"http://localhost:80",
             },
         },
@@ -69,15 +106,6 @@
             }
         },
 
-        //Compile Neo4j plugin
-        {
-            "name": "compile",
-            "type": "PowerShell",
-            "request": "launch",
-            "script": "mvn clean package",
-            "cwd": "${workspaceFolder}/graph/plugins"
-        },
-
         //Data-processing
         {
             "name": "Data-processing",
@@ -96,7 +124,8 @@
             "envFile":"${workspaceFolder}/../libs/.env",
             "env":{
                 "RDS_DBNAME":"third-party",
-                "RDS_HOSTNAME": "127.0.0.2",
+                "RDS_HOSTNAME": "localhost",
+                "RDS_PORT":"15432",
                 "ENV_POSTGRESQL_PASSWORD":"THIRD_PARTY_PASSWORD",
                 "SMTP_PORT":"587",
                 "FROM_USERNAME":"Haku-Sci",
@@ -108,6 +137,14 @@
                 "PUBMED_ABSTRACT_URL":"https://pubmed.ncbi.nlm.nih.gov",
                 "DOI_URL":"https://doi.org",
             }
-        }
+        },
+        //Compile Neo4j plugin
+        {
+            "name": "[plugin] compile neo4j plugin",
+            "type": "PowerShell",
+            "request": "launch",
+            "script": "mvn clean package",
+            "cwd": "${workspaceFolder}/graph/plugins"
+        },
     ]
 }
