@@ -20,6 +20,7 @@ export class TCPService {
             payload["sender"] = await utils.microServiceName()
             let response$ = await client.send([resource, action].join("/"), payload).pipe(
                 catchError(err => {
+                    err = err.error || err;
                     const status = err?.status || HttpStatus.BAD_REQUEST;
                     const payload = {
                         ...(typeof err === 'object' ? err : { message: err }),
