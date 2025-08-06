@@ -11,6 +11,13 @@ jobs:
       POSTGRES_PASSWORD: ${{ secrets.POSTGRESQL_PASSWORD }}
       DB_NAME: ${{ github.event.repository.name }}
     steps:
+      # Set allow ips to send the image
+      - uses: ./.github/workflows/whitelist-gh.yml
+        id: whitelist
+        with:
+          firewall_name: "firewall-github-actions"
+          port: "22"
+      
       - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.4.1
         with:
@@ -73,3 +80,16 @@ jobs:
         run: |
           ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} \
             "docker ps --filter name=postgres --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
+      
+      # Clean ips on the server side
+      - name: Cleanup GitHub runner IP rule
+        uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
+        with:
+          hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
+          ip_address: ${{ steps.whitelist.outputs.ip }}
+          firewall_name: "firewall-github-actions"
+          port: "22"
+          protocol: tcp
+          direction: in
+          description: "github-actions-${{ github.run_id }}"
+          cleanup: true

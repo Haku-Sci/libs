@@ -10,6 +10,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      # Set allow ips to send the image
+      - uses: ./.github/workflows/whitelist-gh.yml
+        id: whitelist
+        with:
+          firewall_name: "firewall-github-actions"
+          port: "22"
+      
       - name: Start ssh-agent
         uses: webfactory/ssh-agent@v0.4.1
         with:
@@ -37,3 +44,16 @@ jobs:
               -v /opt/caddy/data:/data \
               caddy:2-alpine
           EOF
+
+      # Clean ips on the server side
+      - name: Cleanup GitHub runner IP rule
+        uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
+        with:
+          hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
+          ip_address: ${{ steps.whitelist.outputs.ip }}
+          firewall_name: "firewall-github-actions"
+          port: "22"
+          protocol: tcp
+          direction: in
+          description: "github-actions-${{ github.run_id }}"
+          cleanup: true

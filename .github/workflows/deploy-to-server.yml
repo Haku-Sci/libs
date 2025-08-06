@@ -36,6 +36,13 @@ jobs:
           allow: network.host
           network: host
 
+      # Set allow ips to send the image
+      - uses: ./.github/workflows/whitelist-gh.yml
+        id: whitelist
+        with:
+          firewall_name: "firewall-github-actions"
+          port: "22"
+      
       # Start SSH agent
       - name: Start ssh-agent
         uses: webfactory/ssh-agent@v0.4.1
@@ -108,3 +115,17 @@ jobs:
               ${{ steps.set_env_vars.outputs.env_run }} \
               ${{ github.repository }}:latest
           EOF
+      
+      # Clean ips on the server side
+      - name: Cleanup GitHub runner IP rule
+        uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
+        with:
+          hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
+          ip_address: ${{ steps.whitelist.outputs.ip }}
+          firewall_name: "firewall-github-actions"
+          port: "22"
+          protocol: tcp
+          direction: in
+          description: "github-actions-${{ github.run_id }}"
+          cleanup: true
+
