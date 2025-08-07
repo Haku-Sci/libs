@@ -1,0 +1,6 @@
+docker run -d \
+  --name consul-server \
+  -p 8500:8500 \
+  -p 8600:8600/udp \
+  -v $PWD/consul-data:/consul/data \
+  consul
