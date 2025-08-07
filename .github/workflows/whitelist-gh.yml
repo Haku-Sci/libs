@@ -30,4 +30,4 @@ jobs:
           protocol: tcp
           direction: in
           description: "github-actions-${{ github.run_id }}"
-          cleanup: false  # on nettoie manuellement après deploy
+          cleanup: false 
