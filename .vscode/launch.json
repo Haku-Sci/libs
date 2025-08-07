@@ -43,18 +43,6 @@
                 //"NEXT_PUBLIC_API_URL":"http://localhost:80",
             },
         },
-        {
-            "command": "npm run start --prefix ../services/front",
-            "name": "Front (no debug)",
-            "request": "launch",
-            "type": "node-terminal",
-            "envFile":"${workspaceFolder}/../libs/.env",
-            "env":{
-                "PORT":"443",
-                "HOST":"127.43.0.0",
-                "NEXT_PUBLIC_API_URL":"http://localhost:80",
-            },
-        },
         //Api
         {
             "command": "npm run start:dev --prefix ../services/api",
@@ -136,7 +124,20 @@
                 "PUBMED_EFETCH_URL":"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
                 "PUBMED_ABSTRACT_URL":"https://pubmed.ncbi.nlm.nih.gov",
                 "DOI_URL":"https://doi.org",
+                "ALLAS_OPENSTACK_ENDPOINT":"https://pouta.csc.fi:5001/v3",
+                "SIGNED_URL_DURATION": "7200"
             }
+        },
+        //Collab
+        {
+            "command": "npm run start:dev --prefix ../services/collab",
+            "name": "Collab",
+            "request": "launch",
+            "type": "node-terminal",
+            "envFile":"${workspaceFolder}/../libs/.env",
+            "env":{
+                "PORT":"8888"
+            }                   
         },
         //Compile Neo4j plugin
         {
