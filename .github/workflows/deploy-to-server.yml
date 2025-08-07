@@ -2,25 +2,39 @@ name: deploy-to-server
 
 on:
   workflow_call:
-   
+
 jobs:
   whitelist:
-    uses: ./.github/workflows/whitelist-gh.yml
-    with:
-      firewall_name: "firewall-github-actions"
-      port: "22"
-  
+    name: Whitelist GitHub IP
+    runs-on: ubuntu-latest
+    outputs:
+      ip: ${{ steps.get_ip.outputs.ip }}
+    steps:
+      - name: Get public IP of runner
+        id: get_ip
+        run: echo "::set-output name=ip::$(curl -s https://ifconfig.me)"
+
+      - name: Whitelist GitHub runner IP
+        uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
+        with:
+          hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
+          ip_address: ${{ steps.get_ip.outputs.ip }}
+          firewall_name: "firewall-github-actions"
+          port: "22"
+          protocol: tcp
+          direction: in
+          description: "github-actions-${{ github.run_id }}"
+          cleanup: false
+
   deploy:
     name: Build and Deploy
-    needs: whitelist-github
+    needs: whitelist
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -28,8 +42,7 @@ jobs:
             --allow-insecure-entitlement network.host
           driver-opts: |
             network=host
-            
-      # Build Docker image
+
       - name: Build Docker image
         uses: docker/build-push-action@v4
         with:
@@ -43,13 +56,11 @@ jobs:
           allow: network.host
           network: host
 
-      # Start SSH agent
       - name: Start ssh-agent
         uses: webfactory/ssh-agent@v0.4.1
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      # Transfer Docker image to remote server
       - name: Transfer Docker image
         run: |
           docker save ${{ github.repository }}:latest | ssh -o StrictHostKeyChecking=no -p ${{ vars.SSH_PORT }} ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} docker load
@@ -62,7 +73,7 @@ jobs:
             REDIRECT_PORT="-p ${{ vars.DOCKER_PORT_REDIRECT }}"
           fi
           echo "redirected_ports=$REDIRECT_PORT" >> "$GITHUB_OUTPUT"
-      
+
       - name: Prepare all env and secret variables
         id: set_env_vars
         env:
@@ -70,66 +81,51 @@ jobs:
           ALL_VARS: ${{ toJson(vars) }}
         run: |
           ENV_RUN=""
-          
-          # Inject non-secret variables (vars)
           for key in $(echo "$ALL_VARS" | jq -r 'keys[]'); do
-            if [[ "$key" =~ ^(GITHUB|SSH|DOCKER) ]]; then
-              continue
-            fi
+            if [[ "$key" =~ ^(GITHUB|SSH|DOCKER) ]]; then continue; fi
             value=$(echo "$ALL_VARS" | jq -r --arg k "$key" '.[$k]')
             value_escaped=$(printf '%s' "$value" | sed 's/"/\\"/g')
             ENV_RUN+=" -e $key=\"$value_escaped\""
           done
-      
-          # Inject secrets
           for key in $(echo "$ALL_SECRETS" | jq -r 'keys[]'); do
-            if [[ "$key" =~ ^(GITHUB|SSH|DOCKER) ]]; then
-              continue
-            fi
+            if [[ "$key" =~ ^(GITHUB|SSH|DOCKER) ]]; then continue; fi
             value=$(echo "$ALL_SECRETS" | jq -r --arg k "$key" '.[$k]')
             value_escaped=$(printf '%s' "$value" | sed 's/"/\\"/g')
             ENV_RUN+=" -e $key=\"$value_escaped\""
           done
-          ENV_RUN+=" -e SERVICE_PUBLIC_HOSTNAME=${{ vars.SSH_HOST }}"  # set port for external view
+          ENV_RUN+=" -e SERVICE_PUBLIC_HOSTNAME=${{ vars.SSH_HOST }}"
           echo "env_run=$ENV_RUN" >> "$GITHUB_OUTPUT"
-      
+
       - name: Deploy app via SSH
         run: |
           ssh -o StrictHostKeyChecking=no -p ${{ vars.SSH_PORT }} \
               ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} bash << 'EOF'
-            # 1) Remove the old container if it exists
             docker rm -f app || true
-
-            # 2) Create the Docker network (if specified) and build the --network argument
             NETWORK_ARG=""
             if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
-              echo "Creating (or verifying) network '${{ vars.DOCKER_NETWORK }}'..."
               docker network create "${{ vars.DOCKER_NETWORK }}" || true
               NETWORK_ARG="--network ${{ vars.DOCKER_NETWORK }}"
             fi
-
-            # 3) Launch the new container, injecting the network and port/env settings
             docker run -d --name app \
               $NETWORK_ARG \
               ${{ steps.set_redirectports.outputs.redirected_ports }} \
               ${{ steps.set_env_vars.outputs.env_run }} \
               ${{ github.repository }}:latest
           EOF
-      
+
   clean-whitelist:
     runs-on: ubuntu-latest
     needs: deploy
     if: always()
     steps:
-    - name: Cleanup GitHub runner IP rule
-      uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
-      with:
-        hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
-        ip_address: ${{ steps.whitelist.outputs.ip }}
-        firewall_name: "firewall-github-actions"
-        port: "22"
-        protocol: tcp
-        direction: in
-        description: "github-actions-${{ github.run_id }}"
-        cleanup: true
-
+      - name: Cleanup GitHub runner IP rule
+        uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
+        with:
+          hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
+          ip_address: ${{ needs.whitelist.outputs.ip }}
+          firewall_name: "firewall-github-actions"
+          port: "22"
+          protocol: tcp
+          direction: in
+          description: "github-actions-${{ github.run_id }}"
+          cleanup: true

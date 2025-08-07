@@ -4,8 +4,31 @@ on:
   workflow_call:
 
 jobs:
+  whitelist:
+    name: Whitelist GitHub IP
+    runs-on: ubuntu-latest
+    outputs:
+      ip: ${{ steps.get_ip.outputs.ip }}
+    steps:
+      - name: Get public IP of runner
+        id: get_ip
+        run: echo "::set-output name=ip::$(curl -s https://ifconfig.me)"
+
+      - name: Whitelist GitHub runner IP
+        uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
+        with:
+          hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
+          ip_address: ${{ steps.get_ip.outputs.ip }}
+          firewall_name: "firewall-github-actions"
+          port: "22"
+          protocol: tcp
+          direction: in
+          description: "github-actions-${{ github.run_id }}"
+          cleanup: false
+
   deploy-postgres:
     runs-on: ubuntu-latest
+    needs: whitelist
     env:
       POSTGRES_ADMIN: ${{ vars.POSTGRESQL_USER }}
       POSTGRES_PASSWORD: ${{ secrets.POSTGRESQL_PASSWORD }}
