@@ -109,7 +109,7 @@ jobs:
   
   deploy:
     runs-on: ubuntu-latest
-    needs: whitelist
+    #needs: whitelist
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
