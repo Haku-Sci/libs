@@ -150,4 +150,3 @@ jobs:
           echo "Waiting for firewall rules to apply..."
           sleep 10
           echo "Firewall rules should now be active"
-  
