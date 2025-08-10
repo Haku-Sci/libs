@@ -53,13 +53,6 @@ jobs:
       POSTGRES_PASSWORD: ${{ secrets.POSTGRESQL_PASSWORD }}
       DB_NAME: ${{ github.event.repository.name }}
     steps:
-      # Set allow ips to send the image
-      - uses: ./.github/workflows/whitelist-gh.yml
-        id: whitelist
-        with:
-          firewall_name: "firewall-github-actions"
-          port: "22"
-      
       - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.4.1
         with:

@@ -52,13 +52,6 @@ jobs:
       NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
 
     steps:
-      # Set allow ips to send the image
-      - uses: ./.github/workflows/whitelist-gh.yml
-        id: whitelist
-        with:
-          firewall_name: "firewall-github-actions"
-          port: "22"
-      
       - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.4.1
         with:

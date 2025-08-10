@@ -52,13 +52,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Set allow ips to send the image
-      - uses: ./.github/workflows/whitelist-gh.yml
-        id: whitelist
-        with:
-          firewall_name: "firewall-github-actions"
-          port: "22"
-      
       - name: Start ssh-agent
         uses: webfactory/ssh-agent@v0.4.1
         with:
