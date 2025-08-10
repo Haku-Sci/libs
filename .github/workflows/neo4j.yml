@@ -45,7 +45,7 @@ jobs:
           description: "github-actions-cidrs-${{ github.run_id }}"
           cleanup: false
 
-  deploy-neo4j:
+  deploy:
     runs-on: ubuntu-latest
     needs: whitelist
     env:
