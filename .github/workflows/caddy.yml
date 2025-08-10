@@ -6,6 +6,12 @@ jobs:
     name: Whitelist GitHub Actions IP Ranges
     runs-on: ubuntu-latest
     steps:
+      - name: Check current runner IP
+        run: |
+          echo "Current runner IP:"
+          curl -s https://ifconfig.me
+          echo ""
+      
       - name: Fetch GitHub Actions IP ranges
         id: actions_cidrs
         run: |
@@ -42,11 +48,23 @@ jobs:
           direction: in
           description: "github-actions-cidrs-${{ github.run_id }}"
           cleanup: false
+      
+      - name: Wait for firewall rules to apply
+        run: |
+          echo "Waiting for firewall rules to apply..."
+          sleep 10
+          echo "Firewall rules should now be active"
   
-  deploy-caddy:
+  deploy:
     runs-on: ubuntu-latest
     needs: whitelist
     steps:
+      - name: Check current runner IP
+        run: |
+          echo "Current runner IP:"
+          curl -s https://ifconfig.me
+          echo ""
+      
       - name: Checkout repository
         uses: actions/checkout@v3
       
@@ -85,7 +103,7 @@ jobs:
   # Clean ips on the server side
   clean-whitelist:
     runs-on: ubuntu-latest
-    needs: deploy-caddy
+    needs: deploy
     if: always()
     steps:
       - name: Fetch GitHub Actions IP ranges
