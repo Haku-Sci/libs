@@ -6,21 +6,19 @@ jobs:
     name: Whitelist GitHub Actions IP Ranges
     runs-on: ubuntu-latest
     steps:
-      - name: Check current runner IP
-        run: |
-          echo "Current runner IP:"
-          curl -s https://ifconfig.me
-          echo ""
-      
       - name: Fetch GitHub Actions IP ranges
         id: actions_cidrs
         run: |
-          # Fetch CIDRs and clean them
-          curl -s https://api.github.com/meta | jq -r '.actions[]' | grep -v '^$' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$' > actions_cidrs.txt
+          # Fetch CIDRs and clean them thoroughly
+          curl -s https://api.github.com/meta | jq -r '.actions[]' | \
+            grep -v '^$' | \
+            grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$' | \
+            sort -u > actions_cidrs.txt
           
           # Check file content for debugging
           echo "Retrieved CIDRs:"
           cat actions_cidrs.txt
+          echo "Total count: $(wc -l < actions_cidrs.txt)"
           
           # Check that we have valid CIDRs
           if [ ! -s actions_cidrs.txt ]; then
@@ -28,62 +26,35 @@ jobs:
             exit 1
           fi
           
-          # Create comma-separated list (without spaces)
-          cidrs=$(paste -sd, actions_cidrs.txt | tr -d ' ')
+          # Create comma-separated list (without spaces) and remove any trailing commas
+          cidrs=$(paste -sd, actions_cidrs.txt | sed 's/,$//' | tr -d ' \t\n\r')
+          
+          # Verify no empty elements
+          echo "Checking for empty elements..."
+          echo "$cidrs" | tr ',' '\n' | while read cidr; do
+            if [ -z "$cidr" ]; then
+              echo "Warning: Found empty CIDR element"
+            fi
+          done
           
           # Check final format
           echo "Final format: $cidrs"
+          echo "Final length: ${#cidrs}"
           
           # Use new syntax for outputs
           echo "cidrs=$cidrs" >> $GITHUB_OUTPUT
       
       - name: Whitelist all GitHub Actions ranges
-        run: |
-          # Get firewall ID
-          FIREWALL_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}" \
-            "https://api.hetzner.cloud/v1/firewalls" | \
-            jq -r '.firewalls[] | select(.name=="firewall-github-actions") | .id')
-          
-          echo "Firewall ID: $FIREWALL_ID"
-          
-          if [ "$FIREWALL_ID" = "null" ] || [ -z "$FIREWALL_ID" ]; then
-            echo "Error: Firewall 'firewall-github-actions' not found"
-            exit 1
-          fi
-          
-          # Get current firewall rules
-          curl -s -H "Authorization: Bearer ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}" \
-            "https://api.hetzner.cloud/v1/firewalls/$FIREWALL_ID" | \
-            jq -r '.firewall.rules' > /tmp/current_rules.json
-          
-          # Convert CIDRs to JSON array using files
-          CIDRS="${{ steps.actions_cidrs.outputs.cidrs }}"
-          echo "$CIDRS" | tr ',' '\n' > /tmp/cidrs.txt
-          
-          # Create JSON array from CIDRs file
-          jq -R '{"ip": .}' /tmp/cidrs.txt | jq -s '.' > /tmp/cidr_array.json
-          
-          echo "Number of CIDRs: $(jq '. | length' /tmp/cidr_array.json)"
-          
-          # Create the payload JSON file
-          jq --slurpfile cidr_array /tmp/cidr_array.json --slurpfile current_rules /tmp/current_rules.json \
-            -n '{
-              "rules": ($current_rules[0] + [{
-                "direction": "in",
-                "source_ips": $cidr_array[0],
-                "destination_port": "22",
-                "protocol": "tcp",
-                "description": "github-actions-cidrs-${{ github.run_id }}"
-              }])
-            }' > /tmp/payload.json
-          
-          # Update firewall rules
-          echo "Updating firewall rules..."
-          curl -s -X POST \
-            -H "Authorization: Bearer ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d @/tmp/payload.json \
-            "https://api.hetzner.cloud/v1/firewalls/$FIREWALL_ID/actions/set_rules"
+        uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
+        with:
+          hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
+          custom_cidrs: ${{ steps.actions_cidrs.outputs.cidrs }}
+          firewall_name: "firewall-github-actions"
+          port: "22"
+          protocol: tcp
+          direction: in
+          description: "github-actions-cidrs-${{ github.run_id }}"
+          cleanup: false
       
       - name: Wait for firewall rules to apply
         run: |
@@ -95,12 +66,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: whitelist
     steps:
-      - name: Check current runner IP
-        run: |
-          echo "Current runner IP:"
-          curl -s https://ifconfig.me
-          echo ""
-      
       - name: Checkout repository
         uses: actions/checkout@v3
       
@@ -145,12 +110,16 @@ jobs:
       - name: Fetch GitHub Actions IP ranges
         id: actions_cidrs
         run: |
-          # Fetch CIDRs and clean them
-          curl -s https://api.github.com/meta | jq -r '.actions[]' | grep -v '^$' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$' > actions_cidrs.txt
+          # Fetch CIDRs and clean them thoroughly
+          curl -s https://api.github.com/meta | jq -r '.actions[]' | \
+            grep -v '^$' | \
+            grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$' | \
+            sort -u > actions_cidrs.txt
           
           # Check file content for debugging
           echo "Retrieved CIDRs:"
           cat actions_cidrs.txt
+          echo "Total count: $(wc -l < actions_cidrs.txt)"
           
           # Check that we have valid CIDRs
           if [ ! -s actions_cidrs.txt ]; then
@@ -158,42 +127,32 @@ jobs:
             exit 1
           fi
           
-          # Create comma-separated list (without spaces)
-          cidrs=$(paste -sd, actions_cidrs.txt | tr -d ' ')
+          # Create comma-separated list (without spaces) and remove any trailing commas
+          cidrs=$(paste -sd, actions_cidrs.txt | sed 's/,$//' | tr -d ' \t\n\r')
+          
+          # Verify no empty elements
+          echo "Checking for empty elements..."
+          echo "$cidrs" | tr ',' '\n' | while read cidr; do
+            if [ -z "$cidr" ]; then
+              echo "Warning: Found empty CIDR element"
+            fi
+          done
           
           # Check final format
           echo "Final format: $cidrs"
+          echo "Final length: ${#cidrs}"
           
           # Use new syntax for outputs
           echo "cidrs=$cidrs" >> $GITHUB_OUTPUT
       
       - name: Clean GitHub Actions IP ranges from whitelist
-        run: |
-          # Get firewall ID
-          FIREWALL_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}" \
-            "https://api.hetzner.cloud/v1/firewalls" | \
-            jq -r '.firewalls[] | select(.name=="firewall-github-actions") | .id')
-          
-          echo "Firewall ID: $FIREWALL_ID"
-          
-          if [ "$FIREWALL_ID" = "null" ] || [ -z "$FIREWALL_ID" ]; then
-            echo "Warning: Firewall 'firewall-github-actions' not found"
-            exit 0
-          fi
-          
-          # Get current firewall rules
-          CURRENT_RULES=$(curl -s -H "Authorization: Bearer ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}" \
-            "https://api.hetzner.cloud/v1/firewalls/$FIREWALL_ID" | \
-            jq -r '.firewall.rules')
-          
-          # Remove rules with our description pattern
-          CLEANED_RULES=$(echo $CURRENT_RULES | jq '[.[] | select(.description | test("github-actions-cidrs-") | not)]')
-          
-          # Update firewall rules
-          echo "Cleaning firewall rules..."
-          curl -s -X POST \
-            -H "Authorization: Bearer ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"rules\": $CLEANED_RULES}" \
-            "https://api.hetzner.cloud/v1/firewalls/$FIREWALL_ID/actions/set_rules" | \
-            jq '.'
+        uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
+        with:
+          hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
+          custom_cidrs: ${{ steps.actions_cidrs.outputs.cidrs }}
+          firewall_name: "firewall-github-actions"
+          port: "22"
+          protocol: tcp
+          direction: in
+          description: "github-actions-cidrs-${{ github.run_id }}"
+          cleanup: true
