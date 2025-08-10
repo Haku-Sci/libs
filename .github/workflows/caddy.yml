@@ -9,40 +9,15 @@ jobs:
       - name: Fetch GitHub Actions IP ranges
         id: actions_cidrs
         run: |
+          echo "=== Debug: Raw API response ==="
+          curl -s https://api.github.com/meta | jq -r '.actions'
+          
+          echo "=== Debug: Filtered CIDRs before cleaning ==="
+          curl -s https://api.github.com/meta | jq -r '.actions[]' | head -10
+          
           # Fetch CIDRs and clean them thoroughly
           curl -s https://api.github.com/meta | jq -r '.actions[]' | \
-            grep -v '^$' | \
-            grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$' | \
-            sort -u > actions_cidrs.txt
-          
-          # Check file content for debugging
-          echo "Retrieved CIDRs:"
-          cat actions_cidrs.txt
-          echo "Total count: $(wc -l < actions_cidrs.txt)"
-          
-          # Check that we have valid CIDRs
-          if [ ! -s actions_cidrs.txt ]; then
-            echo "Error: No valid CIDRs found"
-            exit 1
-          fi
-          
-          # Create comma-separated list (without spaces) and remove any trailing commas
-          cidrs=$(paste -sd, actions_cidrs.txt | sed 's/,$//' | tr -d ' \t\n\r')
-          
-          # Verify no empty elements
-          echo "Checking for empty elements..."
-          echo "$cidrs" | tr ',' '\n' | while read cidr; do
-            if [ -z "$cidr" ]; then
-              echo "Warning: Found empty CIDR element"
-            fi
-          done
-          
-          # Check final format
-          echo "Final format: $cidrs"
-          echo "Final length: ${#cidrs}"
-          
-          # Use new syntax for outputs
-          echo "cidrs=$cidrs" >> $GITHUB_OUTPUT
+            grep -v '^
       
       - name: Whitelist all GitHub Actions ranges
         uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
@@ -155,4 +130,24 @@ jobs:
           protocol: tcp
           direction: in
           description: "github-actions-cidrs-${{ github.run_id }}"
-          cleanup: true
+          cleanup: true | \
+            grep -v '^null
+      
+      - name: Whitelist all GitHub Actions ranges
+        uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
+        with:
+          hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
+          custom_cidrs: ${{ steps.actions_cidrs.outputs.cidrs }}
+          firewall_name: "firewall-github-actions"
+          port: "22"
+          protocol: tcp
+          direction: in
+          description: "github-actions-cidrs-${{ github.run_id }}"
+          cleanup: false
+      
+      - name: Wait for firewall rules to apply
+        run: |
+          echo "Waiting for firewall rules to apply..."
+          sleep 10
+          echo "Firewall rules should now be active"
+  
