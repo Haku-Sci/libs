@@ -38,16 +38,48 @@ jobs:
           echo "cidrs=$cidrs" >> $GITHUB_OUTPUT
       
       - name: Whitelist all GitHub Actions ranges
-        uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
-        with:
-          hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
-          custom_cidrs: ${{ steps.actions_cidrs.outputs.cidrs }}
-          firewall_name: "firewall-github-actions"
-          port: "22"
-          protocol: tcp
-          direction: in
-          description: "github-actions-cidrs-${{ github.run_id }}"
-          cleanup: false
+        run: |
+          # Get firewall ID
+          FIREWALL_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}" \
+            "https://api.hetzner.cloud/v1/firewalls" | \
+            jq -r '.firewalls[] | select(.name=="firewall-github-actions") | .id')
+          
+          echo "Firewall ID: $FIREWALL_ID"
+          
+          if [ "$FIREWALL_ID" = "null" ] || [ -z "$FIREWALL_ID" ]; then
+            echo "Error: Firewall 'firewall-github-actions' not found"
+            exit 1
+          fi
+          
+          # Get current firewall rules
+          CURRENT_RULES=$(curl -s -H "Authorization: Bearer ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}" \
+            "https://api.hetzner.cloud/v1/firewalls/$FIREWALL_ID" | \
+            jq -r '.firewall.rules')
+          
+          # Convert CIDRs to array format for Hetzner API
+          CIDRS="${{ steps.actions_cidrs.outputs.cidrs }}"
+          CIDR_ARRAY=$(echo $CIDRS | jq -R 'split(",") | map({"ip": .})')
+          
+          # Create new rule for SSH (port 22)
+          NEW_RULE='{
+            "direction": "in",
+            "source_ips": '$CIDR_ARRAY',
+            "destination_port": "22",
+            "protocol": "tcp",
+            "description": "github-actions-cidrs-${{ github.run_id }}"
+          }'
+          
+          # Add new rule to existing rules
+          UPDATED_RULES=$(echo $CURRENT_RULES | jq --argjson newrule "$NEW_RULE" '. + [$newrule]')
+          
+          # Update firewall rules
+          echo "Updating firewall rules..."
+          curl -s -X POST \
+            -H "Authorization: Bearer ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"rules\": $UPDATED_RULES}" \
+            "https://api.hetzner.cloud/v1/firewalls/$FIREWALL_ID/actions/set_rules" | \
+            jq '.'
       
       - name: Wait for firewall rules to apply
         run: |
@@ -132,13 +164,32 @@ jobs:
           echo "cidrs=$cidrs" >> $GITHUB_OUTPUT
       
       - name: Clean GitHub Actions IP ranges from whitelist
-        uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
-        with:
-          hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
-          custom_cidrs: ${{ steps.actions_cidrs.outputs.cidrs }}
-          firewall_name: "firewall-github-actions"
-          port: "22"
-          protocol: tcp
-          direction: in
-          description: "github-actions-cidrs-${{ github.run_id }}"
-          cleanup: true
+        run: |
+          # Get firewall ID
+          FIREWALL_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}" \
+            "https://api.hetzner.cloud/v1/firewalls" | \
+            jq -r '.firewalls[] | select(.name=="firewall-github-actions") | .id')
+          
+          echo "Firewall ID: $FIREWALL_ID"
+          
+          if [ "$FIREWALL_ID" = "null" ] || [ -z "$FIREWALL_ID" ]; then
+            echo "Warning: Firewall 'firewall-github-actions' not found"
+            exit 0
+          fi
+          
+          # Get current firewall rules
+          CURRENT_RULES=$(curl -s -H "Authorization: Bearer ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}" \
+            "https://api.hetzner.cloud/v1/firewalls/$FIREWALL_ID" | \
+            jq -r '.firewall.rules')
+          
+          # Remove rules with our description pattern
+          CLEANED_RULES=$(echo $CURRENT_RULES | jq '[.[] | select(.description | test("github-actions-cidrs-") | not)]')
+          
+          # Update firewall rules
+          echo "Cleaning firewall rules..."
+          curl -s -X POST \
+            -H "Authorization: Bearer ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"rules\": $CLEANED_RULES}" \
+            "https://api.hetzner.cloud/v1/firewalls/$FIREWALL_ID/actions/set_rules" | \
+            jq '.'
