@@ -52,34 +52,38 @@ jobs:
           fi
           
           # Get current firewall rules
-          CURRENT_RULES=$(curl -s -H "Authorization: Bearer ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}" \
+          curl -s -H "Authorization: Bearer ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}" \
             "https://api.hetzner.cloud/v1/firewalls/$FIREWALL_ID" | \
-            jq -r '.firewall.rules')
+            jq -r '.firewall.rules' > /tmp/current_rules.json
           
-          # Convert CIDRs to array format for Hetzner API
+          # Convert CIDRs to JSON array using files
           CIDRS="${{ steps.actions_cidrs.outputs.cidrs }}"
-          CIDR_ARRAY=$(echo $CIDRS | jq -R 'split(",") | map({"ip": .})')
+          echo "$CIDRS" | tr ',' '\n' > /tmp/cidrs.txt
           
-          # Create new rule for SSH (port 22)
-          NEW_RULE='{
-            "direction": "in",
-            "source_ips": '$CIDR_ARRAY',
-            "destination_port": "22",
-            "protocol": "tcp",
-            "description": "github-actions-cidrs-${{ github.run_id }}"
-          }'
+          # Create JSON array from CIDRs file
+          jq -R '{"ip": .}' /tmp/cidrs.txt | jq -s '.' > /tmp/cidr_array.json
           
-          # Add new rule to existing rules
-          UPDATED_RULES=$(echo $CURRENT_RULES | jq --argjson newrule "$NEW_RULE" '. + [$newrule]')
+          echo "Number of CIDRs: $(jq '. | length' /tmp/cidr_array.json)"
+          
+          # Create the payload JSON file
+          jq --slurpfile cidr_array /tmp/cidr_array.json --slurpfile current_rules /tmp/current_rules.json \
+            -n '{
+              "rules": ($current_rules[0] + [{
+                "direction": "in",
+                "source_ips": $cidr_array[0],
+                "destination_port": "22",
+                "protocol": "tcp",
+                "description": "github-actions-cidrs-${{ github.run_id }}"
+              }])
+            }' > /tmp/payload.json
           
           # Update firewall rules
           echo "Updating firewall rules..."
           curl -s -X POST \
             -H "Authorization: Bearer ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}" \
             -H "Content-Type: application/json" \
-            -d "{\"rules\": $UPDATED_RULES}" \
-            "https://api.hetzner.cloud/v1/firewalls/$FIREWALL_ID/actions/set_rules" | \
-            jq '.'
+            -d @/tmp/payload.json \
+            "https://api.hetzner.cloud/v1/firewalls/$FIREWALL_ID/actions/set_rules"
       
       - name: Wait for firewall rules to apply
         run: |
