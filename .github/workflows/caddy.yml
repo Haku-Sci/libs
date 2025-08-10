@@ -3,6 +3,7 @@ on:
   workflow_call:
 jobs:
   whitelist:
+    if: false
     name: Whitelist GitHub Actions IP Ranges
     runs-on: ubuntu-latest
     steps:
@@ -149,7 +150,8 @@ jobs:
   clean-whitelist:
     runs-on: ubuntu-latest
     needs: deploy
-    if: always()
+    if: false
+    #if: always()
     steps:
       - name: Fetch GitHub Actions IP ranges
         id: actions_cidrs
