@@ -1,8 +1,6 @@
 name: Deploy Caddy via SSH with templated Caddyfile
-
 on:
   workflow_call:
-
 jobs:
   whitelist:
     name: Whitelist GitHub Actions IP Ranges
@@ -44,26 +42,28 @@ jobs:
           direction: in
           description: "github-actions-cidrs-${{ github.run_id }}"
           cleanup: false
-
+  
   deploy:
     runs-on: ubuntu-latest
     needs: whitelist
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-
+      
       - name: Start ssh-agent
         uses: webfactory/ssh-agent@v0.4.1
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
+      
       - name: Add SSH host key
-        run: ssh-keyscan ${{ vars.SSH_HOST }} >> ~/.ssh/known_hosts
-
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ vars.SSH_PORT }} ${{ vars.SSH_HOST }} >> ~/.ssh/known_hosts
+      
       - name: Copy templated Caddyfile to remote
         run: |
           scp -P ${{ vars.SSH_PORT }} Caddyfile ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }}:/tmp/Caddyfile
-
+      
       - name: Deploy Caddy container via SSH
         run: |
           ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} bash << 'EOF'
@@ -79,7 +79,7 @@ jobs:
               -v /opt/caddy/data:/data \
               caddy:2-alpine
           EOF
-
+  
   # Clean ips on the server side
   clean-whitelist:
     runs-on: ubuntu-latest
@@ -89,10 +89,29 @@ jobs:
       - name: Fetch GitHub Actions IP ranges
         id: actions_cidrs
         run: |
-          curl -s https://api.github.com/meta | jq -r '.actions[]' > actions_cidrs.txt
-          echo "::set-output name=cidrs::$(paste -sd, actions_cidrs.txt)"
+          # Fetch CIDRs and clean them
+          curl -s https://api.github.com/meta | jq -r '.actions[]' | grep -v '^$' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$' > actions_cidrs.txt
+          
+          # Check file content for debugging
+          echo "Retrieved CIDRs:"
+          cat actions_cidrs.txt
+          
+          # Check that we have valid CIDRs
+          if [ ! -s actions_cidrs.txt ]; then
+            echo "Error: No valid CIDRs found"
+            exit 1
+          fi
+          
+          # Create comma-separated list (without spaces)
+          cidrs=$(paste -sd, actions_cidrs.txt | tr -d ' ')
+          
+          # Check final format
+          echo "Final format: $cidrs"
+          
+          # Use new syntax for outputs
+          echo "cidrs=$cidrs" >> $GITHUB_OUTPUT
       
-      - name: Whitelist all GitHub Actions ranges
+      - name: Clean GitHub Actions IP ranges from whitelist
         uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
         with:
           hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
@@ -102,4 +121,4 @@ jobs:
           protocol: tcp
           direction: in
           description: "github-actions-cidrs-${{ github.run_id }}"
-          cleanup: false
+          cleanup: true
