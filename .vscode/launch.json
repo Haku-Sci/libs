@@ -41,6 +41,8 @@
                 "HOST":"127.43.0.0",
                 "NEXT_PUBLIC_API_URL":"https://api.haku-sci.com",
                 //"NEXT_PUBLIC_API_URL":"http://localhost:80",
+                "DOI_ENDPOINT":"https://doi.org/",
+                "NEXT_PUBLIC_COLLAB_URL":"wss://localhost:4000"
             },
         },
         //Api
@@ -130,13 +132,13 @@
         },
         //Collab
         {
-            "command": "npm run start:dev --prefix ../services/collab",
+            "command": "npm run dev --prefix ../services/collab",
             "name": "Collab",
             "request": "launch",
             "type": "node-terminal",
             "envFile":"${workspaceFolder}/../libs/.env",
             "env":{
-                "PORT":"8888"
+                "PORT":"4000"
             }                   
         },
         //Compile Neo4j plugin
