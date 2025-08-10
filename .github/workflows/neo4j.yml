@@ -5,25 +5,26 @@ on:
 
 jobs:
   whitelist:
-    name: Whitelist GitHub IP
+    name: Whitelist GitHub Actions IP Ranges
     runs-on: ubuntu-latest
-    outputs:
-      ip: ${{ steps.get_ip.outputs.ip }}
-    steps:
-      - name: Get public IP of runner
-        id: get_ip
-        run: echo "::set-output name=ip::$(curl -s https://ifconfig.me)"
 
-      - name: Whitelist GitHub runner IP
+    steps:
+      - name: Fetch GitHub Actions IP ranges
+        id: actions_cidrs
+        run: |
+          curl -s https://api.github.com/meta | jq -r '.actions[]' > actions_cidrs.txt
+          echo "::set-output name=cidrs::$(paste -sd, actions_cidrs.txt)"
+      
+      - name: Whitelist all GitHub Actions ranges
         uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
         with:
           hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
-          ip_address: ${{ steps.get_ip.outputs.ip }}
+          custom_cidrs: ${{ steps.actions_cidrs.outputs.cidrs }}
           firewall_name: "firewall-github-actions"
           port: "22"
           protocol: tcp
           direction: in
-          description: "github-actions-${{ github.run_id }}"
+          description: "github-actions-cidrs-${{ github.run_id }}"
           cleanup: false
 
   deploy-neo4j:
@@ -112,15 +113,26 @@ jobs:
           ssh -p "${{ vars.SSH_PORT }}" -o StrictHostKeyChecking=no "${{ vars.SSH_USER }}"@"${{ vars.SSH_HOST }}" \
             "docker ps --filter name=neo4j --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
       
-      # Clean ips on the server side
-      - name: Cleanup GitHub runner IP rule
+  # Clean ips on the server side
+  clean-whitelist:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+    steps:
+      - name: Fetch GitHub Actions IP ranges
+        id: actions_cidrs
+        run: |
+          curl -s https://api.github.com/meta | jq -r '.actions[]' > actions_cidrs.txt
+          echo "::set-output name=cidrs::$(paste -sd, actions_cidrs.txt)"
+      
+      - name: Whitelist all GitHub Actions ranges
         uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
         with:
           hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
-          ip_address: ${{ steps.whitelist.outputs.ip }}
+          custom_cidrs: ${{ steps.actions_cidrs.outputs.cidrs }}
           firewall_name: "firewall-github-actions"
           port: "22"
           protocol: tcp
           direction: in
-          description: "github-actions-${{ github.run_id }}"
-          cleanup: true
+          description: "github-actions-cidrs-${{ github.run_id }}"
+          cleanup: false
