@@ -7,13 +7,31 @@ jobs:
   whitelist:
     name: Whitelist GitHub Actions IP Ranges
     runs-on: ubuntu-latest
-
     steps:
       - name: Fetch GitHub Actions IP ranges
         id: actions_cidrs
         run: |
-          curl -s https://api.github.com/meta | jq -r '.actions[]' > actions_cidrs.txt
-          echo "::set-output name=cidrs::$(paste -sd, actions_cidrs.txt)"
+          # Fetch CIDRs and clean them
+          curl -s https://api.github.com/meta | jq -r '.actions[]' | grep -v '^$' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$' > actions_cidrs.txt
+          
+          # Check file content for debugging
+          echo "Retrieved CIDRs:"
+          cat actions_cidrs.txt
+          
+          # Check that we have valid CIDRs
+          if [ ! -s actions_cidrs.txt ]; then
+            echo "Error: No valid CIDRs found"
+            exit 1
+          fi
+          
+          # Create comma-separated list (without spaces)
+          cidrs=$(paste -sd, actions_cidrs.txt | tr -d ' ')
+          
+          # Check final format
+          echo "Final format: $cidrs"
+          
+          # Use new syntax for outputs
+          echo "cidrs=$cidrs" >> $GITHUB_OUTPUT
       
       - name: Whitelist all GitHub Actions ranges
         uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
