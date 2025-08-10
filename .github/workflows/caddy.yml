@@ -9,43 +9,82 @@ jobs:
       - name: Fetch and prepare GitHub Actions IP ranges
         id: actions_cidrs
         run: |
-          # 1. Fetch GitHub meta information and extract only the 'actions' CIDRs
-          #    jq selects only IPv4 CIDR strings from the array
-          curl -s https://api.github.com/meta \
-            | jq -r '.actions[]' \
-            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$' \
-            | grep -v '^$' \
-            | sort -u > actions_cidrs.txt
+          set -euo pipefail
 
-          # 2. Show the retrieved list for debugging purposes
-          echo "Retrieved CIDRs:"
-          cat actions_cidrs.txt
-          echo "Total count: $(wc -l < actions_cidrs.txt)"
+          # -----------------------------------------
+          # 1) Fetch .actions from GitHub meta and
+          #    validate using Python's ipaddress module.
+          #    Python prints CSV to stdout, and debug to stderr.
+          # -----------------------------------------
+          cidrs=$(
+            curl -sS https://api.github.com/meta | python3 - <<'PY'
+          import sys, json, ipaddress
+          data = json.load(sys.stdin)
+          arr = data.get("actions", []) or []
 
-          # 3. Ensure we actually have valid CIDRs
-          if [ ! -s actions_cidrs.txt ]; then
-            echo "Error: No valid CIDRs found"
-            exit 1
-          fi
+          valid = set()
+          invalid = []
+          for entry in arr:
+              if not isinstance(entry, str):
+                  invalid.append(str(entry))
+                  continue
+              s = entry.strip()
+              try:
+                  # strict=False accepts host/net forms like 1.2.3.4/32
+                  net = ipaddress.ip_network(s, strict=False)
+                  # keep both IPv4 and IPv6 if you want; here we keep IPv4 and IPv6
+                  valid.add(str(net))
+              except Exception:
+                  invalid.append(s)
 
-          # 4. Convert the file into a comma-separated string without trailing commas
-          cidrs=$(paste -sd, actions_cidrs.txt | sed 's/,\+$//')
+          # stable sort: by IP bytes then prefix length
+          def sort_key(x):
+              ip, mask = x.split('/')
+              if ':' in ip:           # IPv6: sort by hextets then mask
+                  parts = [int(h,16) for h in ip.split(':') if h!='']
+                  return parts + [int(mask)]
+              else:
+                  parts = [int(p) for p in ip.split('.')]
+                  return parts + [int(mask)]
 
-          # 5. Final safety check: verify each element matches valid CIDR notation
-          echo "Verifying CIDR format..."
-          invalid_count=$(echo "$cidrs" | tr ',' '\n' \
-            | grep -vcE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$')
-          if [ "$invalid_count" -ne 0 ]; then
-            echo "Error: One or more CIDRs are invalid."
-            exit 1
-          fi
+          outs = sorted(valid, key=sort_key)
+          # print CSV to stdout (captured by bash)
+          print(",".join(outs))
 
-          # 6. Show final format for debugging
-          echo "Final CIDR list: $cidrs"
-          echo "Total characters: ${#cidrs}"
+          # print debug info to stderr (visible in job logs)
+          print(f"VALID_COUNT={len(outs)}", file=sys.stderr)
+          print(f"INVALID_COUNT={len(invalid)}", file=sys.stderr)
+          if invalid:
+              print("SAMPLE_INVALID:", file=sys.stderr)
+              for i in invalid[:20]:
+                  print(i, file=sys.stderr)
+          PY
+                  )
 
-          # 7. Save as GitHub Actions output
-          echo "cidrs=$cidrs" >> $GITHUB_OUTPUT
+                  # -----------------------------------------
+                  # 2) Basic sanity checks in bash
+                  # -----------------------------------------
+                  echo "DEBUG: raw CIDR string length (chars): ${#cidrs}"
+                  if [ -z "$cidrs" ]; then
+                    echo "Error: no valid CIDRs found" >&2
+                    exit 1
+                  fi
+
+                  # ensure there are no empty items (this was the original cause)
+                  bad=$(echo "$cidrs" | tr ',' '\n' | grep -vE '^[0-9a-fA-F:.]+/[0-9]+$' || true)
+                  if [ -n "$bad" ]; then
+                    echo "Error: One or more elements failed the final regex check:" >&2
+                    echo "$bad" >&2
+                    exit 1
+                  fi
+
+                  # show how many CIDRs we will pass
+                  echo "Final CIDR count: $(echo "$cidrs" | tr ',' '\n' | wc -l)"
+
+                  # -----------------------------------------
+                  # 3) Export to GitHub Actions output
+                  # -----------------------------------------
+                  echo "cidrs=$cidrs" >> "$GITHUB_OUTPUT"
 
       - name: Whitelist all GitHub Actions ranges
         uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
@@ -64,6 +103,7 @@ jobs:
           echo "Waiting for firewall rules to apply..."
           sleep 10
           echo "Firewall rules should now be active"
+
 
   
   deploy:
