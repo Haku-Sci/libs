@@ -6,50 +6,47 @@ jobs:
     name: Whitelist GitHub Actions IP Ranges
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch GitHub Actions IP ranges
+      - name: Fetch and prepare GitHub Actions IP ranges
         id: actions_cidrs
         run: |
-          echo "=== Debug: Raw API response ==="
-          curl -s https://api.github.com/meta | jq -r '.actions'
-          
-          echo "=== Debug: Filtered CIDRs before cleaning ==="
-          curl -s https://api.github.com/meta | jq -r '.actions[]' | head -10
-          
-          # Fetch CIDRs and clean them thoroughly
-          curl -s https://api.github.com/meta | jq -r '.actions[]' | \
-            grep -v '^$' | \
-            grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$' | \
-            sort -u > actions_cidrs.txt
-          
-          # Check file content for debugging
+          # 1. Fetch GitHub meta information and extract only the 'actions' CIDRs
+          #    jq selects only IPv4 CIDR strings from the array
+          curl -s https://api.github.com/meta \
+            | jq -r '.actions[]' \
+            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$' \
+            | grep -v '^$' \
+            | sort -u > actions_cidrs.txt
+
+          # 2. Show the retrieved list for debugging purposes
           echo "Retrieved CIDRs:"
           cat actions_cidrs.txt
           echo "Total count: $(wc -l < actions_cidrs.txt)"
-          
-          # Check that we have valid CIDRs
+
+          # 3. Ensure we actually have valid CIDRs
           if [ ! -s actions_cidrs.txt ]; then
             echo "Error: No valid CIDRs found"
             exit 1
           fi
-          
-          # Create comma-separated list (without spaces) and remove any trailing commas
-          cidrs=$(paste -sd, actions_cidrs.txt | sed 's/,$//' | tr -d ' \t\n\r')
-          
-          # Verify no empty elements
-          echo "Checking for empty elements..."
-          echo "$cidrs" | tr ',' '\n' | while read cidr; do
-            if [ -z "$cidr" ]; then
-              echo "Warning: Found empty CIDR element"
-            fi
-          done
-          
-          # Check final format
-          echo "Final format: $cidrs"
-          echo "Final length: ${#cidrs}"
-          
-          # Use new syntax for outputs
+
+          # 4. Convert the file into a comma-separated string without trailing commas
+          cidrs=$(paste -sd, actions_cidrs.txt | sed 's/,\+$//')
+
+          # 5. Final safety check: verify each element matches valid CIDR notation
+          echo "Verifying CIDR format..."
+          invalid_count=$(echo "$cidrs" | tr ',' '\n' \
+            | grep -vcE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$')
+          if [ "$invalid_count" -ne 0 ]; then
+            echo "Error: One or more CIDRs are invalid."
+            exit 1
+          fi
+
+          # 6. Show final format for debugging
+          echo "Final CIDR list: $cidrs"
+          echo "Total characters: ${#cidrs}"
+
+          # 7. Save as GitHub Actions output
           echo "cidrs=$cidrs" >> $GITHUB_OUTPUT
-      
+
       - name: Whitelist all GitHub Actions ranges
         uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
         with:
@@ -61,12 +58,13 @@ jobs:
           direction: in
           description: "github-actions-cidrs-${{ github.run_id }}"
           cleanup: false
-      
+
       - name: Wait for firewall rules to apply
         run: |
           echo "Waiting for firewall rules to apply..."
           sleep 10
           echo "Firewall rules should now be active"
+
   
   deploy:
     runs-on: ubuntu-latest
