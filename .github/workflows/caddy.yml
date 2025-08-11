@@ -140,6 +140,7 @@ jobs:
             mv /tmp/Caddyfile /opt/caddy/config/Caddyfile
             docker run -d \
               --name caddy \
+              --network host \
               -p 80:80 -p 443:443 \
               -v /opt/caddy/config/Caddyfile:/etc/caddy/Caddyfile:ro \
               -v /opt/caddy/data:/data \
