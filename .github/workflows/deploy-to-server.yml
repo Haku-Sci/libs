@@ -64,13 +64,18 @@ jobs:
       
       - name: Set dynamic build-args for NEXT_PUBLIC_ vars
         id: buildargs
+        env:
+          ALL_VARS: ${{ toJSON(vars) }}
         run: |
           args=""
-          for key in $(echo "${{ toJson(secrets) }} ${{ toJson(vars) }}" | jq -r 'fromjson? or . | keys[]?' | grep '^NEXT_PUBLIC_'); do
-            val="${{ secrets.$(echo $key) || vars.$(echo $key) }}"
-            args="$args --build-arg $key=\"$val\""
+          combined=$(echo "$ALL_VARS" | jq -r 'to_entries | map({key: .key, value: .value})')
+          for key in $(echo "$combined" | jq -r '.[] | select(.key | startswith("NEXT_PUBLIC_")) | .key'); do
+            value=$(echo "$combined" | jq -r --arg k "$key" '.[] | select(.key == $k) | .value')
+            safe=$(printf '%s' "$value" | sed 's/"/\\"/g')
+            args="$args --build-arg $key=\"$safe\""
           done
           echo "build_args=$args" >> "$GITHUB_OUTPUT"
+
 
       - name: Build Docker image
         uses: docker/build-push-action@v4
