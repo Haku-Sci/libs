@@ -83,7 +83,9 @@ jobs:
           echo "build_args=$args" >> "$GITHUB_OUTPUT"
 
 
-      - name: Build Docker image
+      # With cache (default)
+      - name: Build Docker image (with cache)
+        if: ${{ inputs.no-cache == false }}
         uses: docker/build-push-action@v4
         with:
           context: .
@@ -91,12 +93,29 @@ jobs:
           load: true
           platforms: ${{ vars.DOCKER_PLATFORM }}
           cache-from: type=gha,scope=${{ github.ref_name }}-app
-          cache-to:   type=gha,mode=max,scope=${{ github.ref_name }}-app
-          no-cache: ${{ inputs.no-cache }}
+          cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-app
+          no-cache: false
           tags: ${{ github.repository }}:latest
           allow: network.host
           network: host
           build-args: ${{ steps.buildargs.outputs.build_args }}
+
+      # Without cache (no-cache = true)
+      - name: Build Docker image (no cache)
+        if: ${{ inputs.no-cache == true }}
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          platforms: ${{ vars.DOCKER_PLATFORM }}
+          no-cache: true
+          tags: ${{ github.repository }}:latest
+          allow: network.host
+          network: host
+          build-args: ${{ steps.buildargs.outputs.build_args }}
+
+
 
       - name: Start ssh-agent
         uses: webfactory/ssh-agent@v0.4.1
