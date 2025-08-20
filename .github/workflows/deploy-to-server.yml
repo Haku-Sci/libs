@@ -2,6 +2,12 @@ name: deploy-to-server
 
 on:
   workflow_call:
+    inputs:
+      no-cache:
+        description: 'Force Docker build without cache'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   whitelist:
@@ -86,6 +92,7 @@ jobs:
           platforms: ${{ vars.DOCKER_PLATFORM }}
           cache-from: type=gha,scope=${{ github.ref_name }}-app
           cache-to:   type=gha,mode=max,scope=${{ github.ref_name }}-app
+          no-cache: ${{ inputs.no-cache }}
           tags: ${{ github.repository }}:latest
           allow: network.host
           network: host
