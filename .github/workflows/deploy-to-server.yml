@@ -61,6 +61,16 @@ jobs:
             --allow-insecure-entitlement network.host
           driver-opts: |
             network=host
+      
+      - name: Set dynamic build-args for NEXT_PUBLIC_ vars
+        id: buildargs
+        run: |
+          args=""
+          for key in $(echo "${{ toJson(secrets) }} ${{ toJson(vars) }}" | jq -r 'fromjson? or . | keys[]?' | grep '^NEXT_PUBLIC_'); do
+            val="${{ secrets.$(echo $key) || vars.$(echo $key) }}"
+            args="$args --build-arg $key=\"$val\""
+          done
+          echo "build_args=$args" >> "$GITHUB_OUTPUT"
 
       - name: Build Docker image
         uses: docker/build-push-action@v4
@@ -74,6 +84,7 @@ jobs:
           tags: ${{ github.repository }}:latest
           allow: network.host
           network: host
+          build-args: ${{ steps.buildargs.outputs.build_args }}
 
       - name: Start ssh-agent
         uses: webfactory/ssh-agent@v0.4.1
