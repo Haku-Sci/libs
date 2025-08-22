@@ -144,13 +144,13 @@ jobs:
           for key in $(echo "$ALL_VARS" | jq -r 'keys[]'); do
             if [[ "$key" =~ ^(GITHUB|SSH|DOCKER) ]]; then continue; fi
             value=$(echo "$ALL_VARS" | jq -r --arg k "$key" '.[$k]')
-            value_escaped=$(printf '%s' "$value" | sed 's/"/\\"/g; s/\r/\\r/g; s/\n/\\n/g')
+            value_escaped=$(printf '%s' "$value" | sed 's/"/\\"/g' | tr '\r\n' ' ' | sed 's/  */ /g')
             ENV_RUN+=" -e $key=\"$value_escaped\""
           done
           for key in $(echo "$ALL_SECRETS" | jq -r 'keys[]'); do
             if [[ "$key" =~ ^(GITHUB|SSH|DOCKER) ]]; then continue; fi
             value=$(echo "$ALL_SECRETS" | jq -r --arg k "$key" '.[$k]')
-            value_escaped=$(printf '%s' "$value" | sed 's/"/\\"/g; s/\r/\\r/g; s/\n/\\n/g')
+            value_escaped=$(printf '%s' "$value" | sed 's/"/\\"/g' | tr '\r\n' ' ' | sed 's/  */ /g')
             ENV_RUN+=" -e $key=\"$value_escaped\""
           done
           ENV_RUN+=" -e SERVICE_PUBLIC_HOSTNAME=${{ vars.SSH_HOST }}"
