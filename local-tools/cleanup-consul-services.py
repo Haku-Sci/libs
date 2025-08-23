@@ -1,6 +1,6 @@
 import requests
 
-LOCAL = "http://127.0.0.1:8500"
+LOCAL = "http://hubs.haku-sci.com:8500"
 
 def get_local_services():
     """Fetch local agent's registered services."""

@@ -1,7 +1,7 @@
 import requests
 
-REMOTE = "http://consul.haku-sci.com:8500"
-LOCAL = "http://127.0.0.1:8500"
+REMOTE = "http://hubs.haku-sci.com:8500"
+LOCAL = "http://test.hubs.haku-sci.com:8500"
 
 def get_remote_services():
     # Fetch list of all remote service names
