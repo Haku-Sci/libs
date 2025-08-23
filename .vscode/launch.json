@@ -38,11 +38,10 @@
             "envFile":"${workspaceFolder}/../libs/.env",
             "env":{
                 "PORT":"443",
-                "HOST":"127.43.0.0",
-                "NEXT_PUBLIC_API_URL":"https://api.haku-sci.com",
-                //"NEXT_PUBLIC_API_URL":"http://localhost:80",
+                "HOST":"test.front.haku-sci.com",
+                "NEXT_PUBLIC_API_URL":"${input:api}",
                 "DOI_ENDPOINT":"https://doi.org/",
-                "NEXT_PUBLIC_COLLAB_URL":"wss://localhost:4000"
+                "COLLAB_URL":"${input:collab}"
             },
         },
         //Api
@@ -53,8 +52,11 @@
             "type": "node-terminal",
             "envFile":"${workspaceFolder}/../libs/.env",
             "env": {
-                "PORT":"80",
-                "JWT_SECRET":"1234"
+                "PORT":"443",
+                "ADDRESS":"test.api.haku-sci.com",
+                "JWT_SECRET":"1234",
+                "CORS_ORIGINS":"https://www.haku-sci.com https://test.front.haku-sci.com https://haku-sci.com",
+                "CONSUL_URL":"${input:consul}"
             }
         },
         //Confidential-properties
@@ -138,7 +140,8 @@
             "type": "node-terminal",
             "envFile":"${workspaceFolder}/../libs/.env",
             "env":{
-                "PORT":"4000"
+                "PORT":"4000",
+                "ADDRESS":"test.collab.haku-sci.com",
             }                   
         },
         //Compile Neo4j plugin
@@ -149,5 +152,37 @@
             "script": "mvn clean package",
             "cwd": "${workspaceFolder}/graph/plugins"
         },
+    ],
+    "inputs": [        
+        {
+            "id": "api",
+            "description": "API Url",
+            "default": "https://api.haku-sci.com",
+            "type": "pickString",
+            "options": [
+                "https://api.haku-sci.com",
+                "https://test.api.haku-sci.com",                
+            ]
+        },
+        {
+            "id": "consul",
+            "description": "Consul Url",
+            "default": "http://localhost:8500",
+            "type": "pickString",
+            "options": [
+                "http://test.hubs.haku-sci.com:8500",
+                "http://hubs.haku-sci.com:8500",
+            ]
+        },
+        {
+            "id": "collab",
+            "description": "Collab Url",
+            "default": "wss://collab.haku-sci.com:4000",
+            "type": "pickString",
+            "options": [
+                "wss://test.collab.haku-sci.com:4000",
+                "wss://collab.haku-sci.com:4000",                
+            ]
+        }
     ]
 }
