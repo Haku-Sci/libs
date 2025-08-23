@@ -59,6 +59,18 @@
                 "CONSUL_URL":"${input:consul}"
             }
         },
+        //Collab
+        {
+            "command": "npm run dev --prefix ../services/collab",
+            "name": "Collab",
+            "request": "launch",
+            "type": "node-terminal",
+            "envFile":"${workspaceFolder}/../libs/.env",
+            "env":{
+                "PORT":"4000",
+                "ADDRESS":"test.collab.haku-sci.com",
+            }                   
+        },
         //Confidential-properties
         {
             "command": "npm run start:dev --prefix ../services/confidential-properties",
@@ -132,18 +144,6 @@
                 "SIGNED_URL_DURATION": "7200"
             }
         },
-        //Collab
-        {
-            "command": "npm run dev --prefix ../services/collab",
-            "name": "Collab",
-            "request": "launch",
-            "type": "node-terminal",
-            "envFile":"${workspaceFolder}/../libs/.env",
-            "env":{
-                "PORT":"4000",
-                "ADDRESS":"test.collab.haku-sci.com",
-            }                   
-        },
         //Compile Neo4j plugin
         {
             "name": "[plugin] compile neo4j plugin",
@@ -167,7 +167,7 @@
         {
             "id": "consul",
             "description": "Consul Url",
-            "default": "http://localhost:8500",
+            "default": "http://test.hubs.haku-sci.com:8500",
             "type": "pickString",
             "options": [
                 "http://test.hubs.haku-sci.com:8500",
