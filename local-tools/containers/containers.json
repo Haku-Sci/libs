@@ -1,0 +1,22 @@
+{
+  "postgres": {
+    "image": "postgres:latest",
+    "ports": { "5432": 5432 },
+    "env": {
+      "POSTGRES_USER": "admin",
+      "POSTGRES_PASSWORD": "password",
+      "POSTGRES_DB": "postgres"
+    },
+    "additional_args": []
+  },
+  "neo4j": {
+    "image": "neo4j:latest",
+    "ports": { "7474": 7474, "7687": 7687, "5005": 5005 },
+    "env": {
+      "NEO4J_AUTH": "neo4j/password",
+      "NEO4J_PLUGINS": "[\"apoc\", \"graph-data-science\"]",
+      "_NEO4J_server_jvm_additional": "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+    },
+    "additional_args": []
+  }
+}
