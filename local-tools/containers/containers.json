@@ -17,6 +17,7 @@
       "NEO4J_PLUGINS": "[\"apoc\", \"graph-data-science\"]",
       "_NEO4J_server_jvm_additional": "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
     },
-    "additional_args": []
+    "additional_args": [],
+    "on_load":["cp", "D:/Haku-Sci/services/graph/plugins/target/graph-libs-1.0.jar", "neo4j:/var/lib/neo4j/plugins/graph-libs-1.0.jar"]
   }
 }
