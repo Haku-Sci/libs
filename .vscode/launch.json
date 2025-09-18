@@ -3,32 +3,14 @@
     // Hover to view descriptions of existing attributes.
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
-    "configurations": [
-        //local tools
+    "configurations": [        
+        //local tools        
         {
-            "name": "[Local Tools] start consul and tunnels",
-            "type": "debugpy",
+            "name": "[Local Tools] start local tools",
+            "type": "node-terminal",
             "request": "launch",
-            "program": "${workspaceFolder}/../libs/local-tools/start_services.py",
-            "console": "integratedTerminal",
-            "justMyCode": true
+            "command": "python ${workspaceFolder}/../libs/local-tools/start-local-tools.py neo4j postgres"
         },
-        {
-            "name": "[Local Tools] set consul services",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/../libs/local-tools/set-consul-services.py",
-            "justMyCode": true
-        },
-        {
-            "name": "[Local Tools] clean consul services",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/../libs/local-tools/cleanup-consul-services.py",
-            "justMyCode": true
-        },
-
-
         //Front
         {
             "command": "npm run dev-https --prefix ../services/front",
@@ -39,7 +21,7 @@
             "env":{
                 "PORT":"443",
                 "HOST":"test.front.haku-sci.com",
-                "NEXT_PUBLIC_API_URL":"${input:api}",
+                "API_URL":"${input:api}",
                 "DOI_ENDPOINT":"https://doi.org/",
                 "COLLAB_URL":"${input:collab}"
             },
@@ -54,7 +36,6 @@
             "env": {
                 "PORT":"443",
                 "ADDRESS":"test.api.haku-sci.com",
-                "JWT_SECRET":"1234",
                 "CORS_ORIGINS":"https://www.haku-sci.com https://test.front.haku-sci.com https://haku-sci.com",
                 "CONSUL_URL":"${input:consul}"
             }
@@ -68,7 +49,9 @@
             "envFile":"${workspaceFolder}/../libs/.env",
             "env":{
                 "PORT":"4000",
+                "API_URL":"${input:api}",
                 "ADDRESS":"test.collab.haku-sci.com",
+                "NODE_TLS_REJECT_UNAUTHORIZED":"0",
             }                   
         },
         //Confidential-properties
@@ -129,7 +112,6 @@
             "env":{
                 "RDS_DBNAME":"third-party",
                 "RDS_HOSTNAME": "localhost",
-                "RDS_PORT":"15432",
                 "ENV_POSTGRESQL_PASSWORD":"THIRD_PARTY_PASSWORD",
                 "SMTP_PORT":"587",
                 "FROM_USERNAME":"Haku-Sci",
@@ -141,17 +123,45 @@
                 "PUBMED_ABSTRACT_URL":"https://pubmed.ncbi.nlm.nih.gov",
                 "DOI_URL":"https://doi.org",
                 "ALLAS_OPENSTACK_ENDPOINT":"https://pouta.csc.fi:5001/v3",
-                "SIGNED_URL_DURATION": "7200"
+                "SIGNED_URL_DURATION": "1"
             }
         },
         //Compile Neo4j plugin
         {
             "name": "[plugin] compile neo4j plugin",
-            "type": "PowerShell",
+            "type": "node-terminal",
             "request": "launch",
-            "script": "mvn clean package",
-            "cwd": "${workspaceFolder}/graph/plugins"
+            "command": "mvn clean package; python ${workspaceFolder}/../libs/local-tools/containers/start-container.py neo4j",
+            "cwd": "${workspaceFolder}/../services/graph/plugins"
         },
+        {
+            "name": "[Local Tools] start tunnels",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/../libs/local-tools/start-distant-dbs.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "[Local Tools] set consul services",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/../libs/local-tools/set-consul-services.py",
+            "justMyCode": true
+        },
+        {
+            "name": "[Local Tools] clean consul services",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/../libs/local-tools/cleanup-consul-services.py",
+            "justMyCode": true
+        },
+        {
+            "name": "Run service controller",
+            "request": "launch",
+            "type": "chrome",
+            "file": "${workspaceFolder}/../libs/local-tools/services-controller/index.html"
+        }
     ],
     "inputs": [        
         {
@@ -177,11 +187,11 @@
         {
             "id": "collab",
             "description": "Collab Url",
-            "default": "wss://collab.haku-sci.com:4000",
+            "default": "wss://test.collab.haku-sci.com:4000",
             "type": "pickString",
             "options": [
                 "wss://test.collab.haku-sci.com:4000",
-                "wss://collab.haku-sci.com:4000",                
+                "wss://collab.haku-sci.com:443",                
             ]
         }
     ]
