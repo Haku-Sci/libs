@@ -21,9 +21,9 @@
             "env":{
                 "PORT":"443",
                 "HOST":"test.front.haku-sci.com",
-                "API_URL":"${input:api}",
+                "API_URL":"https://test.api.haku-sci.com",
                 "DOI_ENDPOINT":"https://doi.org/",
-                "COLLAB_URL":"${input:collab}"
+                "COLLAB_URL":"wss://test.collab.haku-sci.com:4000"
             },
         },
         //Api
@@ -37,9 +37,10 @@
                 "PORT":"443",
                 "ADDRESS":"test.api.haku-sci.com",
                 "CORS_ORIGINS":"https://www.haku-sci.com https://test.front.haku-sci.com https://haku-sci.com",
-                "CONSUL_URL":"${input:consul}"
+                "CONSUL_URL":"http://test.hubs.haku-sci.com:8500"
             }
         },
+        
         //Collab
         {
             "command": "npm run dev --prefix ../services/collab",
@@ -49,7 +50,7 @@
             "envFile":"${workspaceFolder}/../libs/.env",
             "env":{
                 "PORT":"4000",
-                "API_URL":"${input:api}",
+                "API_URL":"https://test.api.haku-sci.com",
                 "ADDRESS":"test.collab.haku-sci.com",
                 "NODE_TLS_REJECT_UNAUTHORIZED":"0",
             }                   
@@ -67,18 +68,6 @@
                 "ENV_POSTGRESQL_PASSWORD":"CONFIDENTIAL_PROPERTIES_PASSWORD"
             }
         },
-        //Cron
-        {
-            "name": "Cron",
-            "type": "go",
-            "request": "launch",
-            "mode": "auto",
-            "program": "../services/cron/main.go",
-            "envFile":"${workspaceFolder}/../libs/.env", 
-            "console": "integratedTerminal",
-            "showLog": true 
-        },
-
         //Graph
         {
             "command": "npm run start:dev --prefix ../services/graph",
@@ -91,16 +80,6 @@
                 "NEO4J_USER":"neo4j",                
                 "SUPER_ADMIN_LOGIN":"SuperAdmin@haku-sci.com",                
             }
-        },
-
-        //Data-processing
-        {
-            "name": "Data-processing",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/data-processing/app/main.py",
-            "console": "integratedTerminal",
-            "envFile":"${workspaceFolder}/../libs/.env"
         },
         //Third-party
         {
@@ -126,6 +105,16 @@
                 "SIGNED_URL_DURATION": "1"
             }
         },
+        //Smee (GitHub Webhook Proxy)
+        {
+            "name": "Smee - GitHub Webhooks",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "smee -u https://smee.io/wgc4FQgaHN1haMyp -t https://test.api.haku-sci.com/webhook/github/issue",
+            "env": {
+                "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+            }
+        },
         //Compile Neo4j plugin
         {
             "name": "[plugin] compile neo4j plugin",
@@ -133,6 +122,27 @@
             "request": "launch",
             "command": "mvn clean package; python ${workspaceFolder}/../libs/local-tools/containers/start-container.py neo4j",
             "cwd": "${workspaceFolder}/../services/graph/plugins"
+        },
+        //Not yet used serices
+        //Cron
+        {
+            "name": "Cron",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "../services/cron/main.go",
+            "envFile":"${workspaceFolder}/../libs/.env", 
+            "console": "integratedTerminal",
+            "showLog": true 
+        },
+        //Data-processing
+        {
+            "name": "Data-processing",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/data-processing/app/main.py",
+            "console": "integratedTerminal",
+            "envFile":"${workspaceFolder}/../libs/.env"
         },
         {
             "name": "[Local Tools] start tunnels",

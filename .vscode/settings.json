@@ -1,0 +1,4 @@
+{
+    "debugLauncher.servicesJsonPath": "local-tools/services-controller/micro-services.json",
+    "debugLauncher.htmlFile": "local-tools/services-controller/index.html"
+}
