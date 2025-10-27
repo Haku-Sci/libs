@@ -21,6 +21,7 @@ export class AllExceptionsFilter implements RpcExceptionFilter<any> {
   }
 
   private handleException(exception: any): Observable<any | never> {
+    console.error(exception);
     return throwError(() => new RpcException(exception));
   }
 }
