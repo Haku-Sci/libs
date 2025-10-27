@@ -20,10 +20,10 @@
             "envFile":"${workspaceFolder}/../libs/.env",
             "env":{
                 "PORT":"443",
-                "HOST":"test.front.haku-sci.com",
-                "API_URL":"https://test.api.haku-sci.com",
+                "HOST":"haku-test.com",
+                "API_URL":"https://api.haku-test.com",
                 "DOI_ENDPOINT":"https://doi.org/",
-                "COLLAB_URL":"wss://test.collab.haku-sci.com:4000"
+                "COLLAB_URL":"wss://collab.haku-test.com:4000"
             },
         },
         //Api
@@ -35,9 +35,9 @@
             "envFile":"${workspaceFolder}/../libs/.env",
             "env": {
                 "PORT":"443",
-                "ADDRESS":"test.api.haku-sci.com",
-                "CORS_ORIGINS":"https://www.haku-sci.com https://test.front.haku-sci.com https://haku-sci.com",
-                "CONSUL_URL":"http://test.hubs.haku-sci.com:8500"
+                "ADDRESS":"api.haku-test.com",
+                "CORS_ORIGINS":"https://www.haku-test.com https://haku-test.com",
+                "CONSUL_URL":"http://hubs.haku-test.com:8500"
             }
         },
         
@@ -50,9 +50,10 @@
             "envFile":"${workspaceFolder}/../libs/.env",
             "env":{
                 "PORT":"4000",
-                "API_URL":"https://test.api.haku-sci.com",
-                "ADDRESS":"test.collab.haku-sci.com",
+                "API_URL":"https://api.haku-test.com",
+                "ADDRESS":"collab.haku-test.com",
                 "NODE_TLS_REJECT_UNAUTHORIZED":"0",
+                "DEBOUNCE": "5000"
             }                   
         },
         //Confidential-properties
@@ -65,7 +66,8 @@
             "env": {
                 "RDS_DBNAME": "confidential-properties",
                 "RDS_HOSTNAME": "localhost",
-                "ENV_POSTGRESQL_PASSWORD":"CONFIDENTIAL_PROPERTIES_PASSWORD"
+                "ENV_POSTGRESQL_PASSWORD":"CONFIDENTIAL_PROPERTIES_PASSWORD",
+                "TEMP_USER_HOURS_DURATION":"48"
             }
         },
         //Graph
@@ -110,7 +112,7 @@
             "name": "Smee - GitHub Webhooks",
             "type": "node-terminal",
             "request": "launch",
-            "command": "smee -u https://smee.io/wgc4FQgaHN1haMyp -t https://test.api.haku-sci.com/webhook/github/issue",
+            "command": "smee -u https://smee.io/wgc4FQgaHN1haMyp -t https://api.haku-test.com/webhook/github/issue",
             "env": {
                 "NODE_TLS_REJECT_UNAUTHORIZED": "0"
             }
