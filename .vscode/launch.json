@@ -112,7 +112,7 @@
             "name": "Smee - GitHub Webhooks",
             "type": "node-terminal",
             "request": "launch",
-            "command": "smee -u https://smee.io/wgc4FQgaHN1haMyp -t https://api.haku-test.com/webhook/github/issue",
+            "command": "smee -u https://smee.io/wgc4FQgaHN1haMyp -t https://api.haku-test.com/github/issue",
             "env": {
                 "NODE_TLS_REJECT_UNAUTHORIZED": "0"
             }
