@@ -131,3 +131,9 @@ jobs:
               ${{ steps.set_env_vars.outputs.env_run }} \
               ${{ github.repository }}:latest
           EOF
+
+      - name: Clean up unused Docker images
+        run: |
+          ssh -o StrictHostKeyChecking=no -p ${{ vars.SSH_PORT }} \
+              ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} \
+              "docker image prune -af"
