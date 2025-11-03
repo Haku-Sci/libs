@@ -67,7 +67,8 @@
                 "RDS_DBNAME": "confidential-properties",
                 "RDS_HOSTNAME": "localhost",
                 "ENV_POSTGRESQL_PASSWORD":"CONFIDENTIAL_PROPERTIES_PASSWORD",
-                "TEMP_USER_HOURS_DURATION":"48"
+                "TEMP_USER_HOURS_DURATION":"48",
+                "NOTIFICATION_READ_RETENTION_DAYS":"1"
             }
         },
         //Graph
