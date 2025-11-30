@@ -56,17 +56,17 @@
                 "DEBOUNCE": "5000"
             }                   
         },
-        //Confidential-properties
+        //vault
         {
-            "command": "npm run start:dev --prefix ../services/confidential-properties",
-            "name": "Confidential-properties",
+            "command": "npm run start:dev --prefix ../services/vault",
+            "name": "Vault",
             "request": "launch",
             "type": "node-terminal",
             "envFile":"${workspaceFolder}/../libs/.env",
             "env": {
-                "RDS_DBNAME": "confidential-properties",
+                "RDS_DBNAME": "vault",
                 "RDS_HOSTNAME": "localhost",
-                "ENV_POSTGRESQL_PASSWORD":"CONFIDENTIAL_PROPERTIES_PASSWORD",
+                "ENV_POSTGRESQL_PASSWORD":"VAULT_PASSWORD",
                 "TEMP_USER_HOURS_DURATION":"48",
                 "NOTIFICATION_READ_RETENTION_DAYS":"1"
             }

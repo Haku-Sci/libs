@@ -1,5 +1,5 @@
 # microservices list
-$microservices = @("api","graph", "third-party","confidential-properties")
+$microservices = @("api","graph", "third-party","vault")
 
 # Update hakusci libs for each microservice
 foreach ($microservice in $microservices) {

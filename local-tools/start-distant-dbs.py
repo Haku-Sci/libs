@@ -27,7 +27,7 @@ if __name__ == "__main__":
     try:
        # Launch tunnels
         start_tunnel(["ssh", "-N", "-L", "7474:localhost:7474", "-L", "7687:localhost:7687", "graph"])
-        start_tunnel(["ssh", "-N", "-L", "5432:localhost:5432", "confidential-properties"])
+        start_tunnel(["ssh", "-N", "-L", "5432:localhost:5432", "vault"])
         start_tunnel(["ssh", "-N", "-L", "15432:127.0.10.2:5432", "third-party"])
 
         print("Waiting until a tunnel exits or Ctrl+C.")
