@@ -85,10 +85,6 @@ jobs:
           SERVICE_NAME="${{ steps.service.outputs.name }}"
           DEPLOY_TAG="${{ steps.meta.outputs.deploy_tag }}"
 
-          # Clone manifest repo
-          git clone https://${{ secrets.MANIFEST_REPO_TOKEN }}@github.com/${{ github.repository_owner }}/deployment-manifest.git
-          cd deployment-manifest
-
           # Configure git
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "GitHub Actions"
@@ -164,14 +160,8 @@ jobs:
           SERVICE_NAME="${{ steps.service.outputs.name }}"
           DEPLOY_TAG="${{ steps.meta.outputs.deploy_tag }}"
 
-          # Clone manifest repo (fresh clone)
-          rm -rf deployment-manifest
-          git clone https://${{ secrets.MANIFEST_REPO_TOKEN }}@github.com/${{ github.repository_owner }}/deployment-manifest.git
-          cd deployment-manifest
-
-          # Configure git
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "GitHub Actions"
+          # Pull latest changes (in case other builds updated the repo)
+          git pull --rebase
 
           # Update manifest with status "ready"
           cat > manifests/${SERVICE_NAME}.json <<EOF

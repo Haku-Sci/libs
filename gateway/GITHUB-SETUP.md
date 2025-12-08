@@ -12,7 +12,7 @@ GitHub Actions
     │ manifest: status="ready"
     │
     ▼
-deployment-manifest repo
+libs repo (manifests/ folder)
     │
     │ (Gateway polls every 5 min)
     │
@@ -30,9 +30,7 @@ Target Servers
 
 1. **GitHub Personal Access Token** with permissions:
    - `read:packages` (to pull from GHCR)
-   - `repo` (to clone deployment-manifest)
-
-2. **deployment-manifest repository** created on GitHub
+   - `repo` (to clone libs repo - optional if using public repo)
 
 ## Installation on Gateway
 
@@ -64,13 +62,13 @@ From your local machine, upload the config files:
 
 ```powershell
 # Upload services.json
-scp ssh/gateway-services.json gateway:/opt/gateway/services.json
+scp gateway/gateway-services.json gateway:/opt/gateway/services.json
 
 # Upload deploy script
-scp ssh/deploy.sh gateway:/opt/gateway/deploy.sh
+scp gateway/deploy.sh gateway:/opt/gateway/deploy.sh
 
 # Upload watch script
-scp ssh/watch-manifest.sh gateway:/opt/gateway/watch-manifest.sh
+scp gateway/watch-manifest.sh gateway:/opt/gateway/watch-manifest.sh
 
 # Make scripts executable
 ssh gateway "chmod +x /opt/gateway/deploy.sh /opt/gateway/watch-manifest.sh"
@@ -85,13 +83,13 @@ ssh gateway
 docker login ghcr.io -u YOUR_GITHUB_USERNAME
 # Password: paste your GitHub Personal Access Token
 
-# Configure Git for manifest repo
+# Configure Git
 git config --global user.email "gateway@yourdomain.com"
 git config --global user.name "Gateway Server"
 
-# Clone manifest repo (test)
+# Clone libs repo (test)
 cd /opt/gateway
-git clone https://YOUR_TOKEN@github.com/YOUR-ORG/deployment-manifest.git manifest-repo
+git clone https://YOUR_TOKEN@github.com/YOUR-ORG/libs.git libs-repo
 ```
 
 ### Step 5: Update Configuration
@@ -103,11 +101,11 @@ ssh gateway
 sudo nano /opt/gateway/services.json
 ```
 
-Edit `/opt/gateway/watch-manifest.sh` and update the manifest repo URL:
+Edit `/opt/gateway/watch-manifest.sh` and update the libs repo URL:
 
 ```bash
 sudo nano /opt/gateway/watch-manifest.sh
-# Change: MANIFEST_REPO_URL="https://github.com/YOUR-ORG/deployment-manifest.git"
+# Change: MANIFEST_REPO_URL="https://github.com/YOUR-ORG/libs.git"
 ```
 
 ### Step 6: Configure Cron Job
@@ -135,13 +133,11 @@ ssh gateway "/opt/gateway/watch-manifest.sh"
 ssh gateway "tail -f /opt/gateway/logs/watch-$(date +%Y-%m-%d).log"
 ```
 
-## GitHub Secrets Configuration
+## GitHub Configuration
 
-In each service repository, add these secrets:
+No additional secrets required! The workflow uses `GITHUB_TOKEN` (automatically provided).
 
-1. **MANIFEST_REPO_TOKEN**: GitHub Personal Access Token with `repo` permission
-
-In GitHub Actions variables, set:
+In GitHub Actions variables (Settings → Secrets and variables → Actions → Variables), set:
 
 1. **DOCKER_PLATFORM**: `linux/amd64` (or your platform)
 
@@ -203,7 +199,7 @@ ssh gateway "docker login ghcr.io"
 
 Check Git credentials:
 ```bash
-ssh gateway "cd /opt/gateway/manifest-repo && git pull"
+ssh gateway "cd /opt/gateway/libs-repo && git pull"
 ```
 
 ### Cron not running
@@ -220,7 +216,7 @@ ssh gateway "tail -f /var/log/syslog | grep CRON"
 | `/opt/gateway/services.json` | Service configuration |
 | `/opt/gateway/deploy.sh` | Deployment script |
 | `/opt/gateway/watch-manifest.sh` | Manifest watcher |
-| `/opt/gateway/manifest-repo/` | Cloned manifest repository |
+| `/opt/gateway/libs-repo/` | Cloned libs repository (contains manifests/) |
 | `/opt/gateway/deployed/` | Tracking deployed versions |
 | `/opt/gateway/logs/` | All logs |
 | `/opt/gateway/logs/deploy-YYYY-MM-DD.log` | Deployment logs |

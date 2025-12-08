@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Gateway manifest watcher
-# Polls the deployment-manifest repo and deploys when all builds are ready
+# Polls the libs repo and deploys when all builds are ready
 
 set -e
 
-MANIFEST_REPO_URL="https://github.com/YOUR-ORG/deployment-manifest.git"
-MANIFEST_DIR="/opt/gateway/manifest-repo"
+MANIFEST_REPO_URL="https://github.com/YOUR-ORG/libs.git"
+MANIFEST_DIR="/opt/gateway/libs-repo"
 DEPLOYED_DIR="/opt/gateway/deployed"
 LOG_DIR="/opt/gateway/logs"
 LOG_FILE="$LOG_DIR/watch-$(date +%Y-%m-%d).log"
