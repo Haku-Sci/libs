@@ -1,0 +1,47 @@
+{
+  "services": {
+    "api": {
+      "target_host": "10.1.0.3",
+      "container_name": "app",
+      "docker_network": "api-network",
+      "port_mapping": "3000:3000"
+    },
+    "front": {
+      "target_host": "10.1.0.6",
+      "container_name": "app",
+      "docker_network": "front-network",
+      "port_mapping": "80:3000"
+    },
+    "graph": {
+      "target_host": "10.1.0.4",
+      "container_name": "app",
+      "docker_network": "graph-network",
+      "port_mapping": "4000:4000"
+    },
+    "vault": {
+      "target_host": "10.1.0.5",
+      "container_name": "app",
+      "docker_network": "vault-network"
+    },
+    "hubs": {
+      "target_host": "10.1.0.2",
+      "container_name": "app",
+      "docker_network": "hubs-network"
+    },
+    "third-party": {
+      "target_host": "10.1.0.7",
+      "container_name": "app",
+      "docker_network": "third-party-network"
+    },
+    "collab": {
+      "target_host": "10.1.0.8",
+      "container_name": "app",
+      "docker_network": "collab-network"
+    }
+  },
+  "registry": {
+    "type": "ghcr",
+    "url": "ghcr.io",
+    "organization": "your-github-org"
+  }
+}
