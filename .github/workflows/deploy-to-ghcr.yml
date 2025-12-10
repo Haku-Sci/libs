@@ -159,6 +159,9 @@ jobs:
           }
           EOF
 
+          # Pull latest changes first
+          git pull --rebase
+
           # Commit and push
           git add manifests/${SERVICE_NAME}.json
           git commit -m "Build started: ${SERVICE_NAME} ${DEPLOY_TAG}"
