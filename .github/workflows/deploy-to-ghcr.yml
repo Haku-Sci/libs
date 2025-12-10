@@ -47,6 +47,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Checkout Gateway repository for manifests
+        uses: actions/checkout@v4
+        with:
+          repository: Haku-Sci/Gateway
+          token: ${{ secrets.GATEWAY_TOKEN }}
+          path: gateway-repo
+
       - name: Extract service name from repository
         id: service
         run: |
@@ -128,6 +135,9 @@ jobs:
         run: |
           SERVICE_NAME="${{ steps.service.outputs.name }}"
           DEPLOY_TAG="${{ steps.meta.outputs.deploy_tag }}"
+
+          # Navigate to Gateway repo
+          cd gateway-repo
 
           # Configure git
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -214,6 +224,9 @@ jobs:
         run: |
           SERVICE_NAME="${{ steps.service.outputs.name }}"
           DEPLOY_TAG="${{ steps.meta.outputs.deploy_tag }}"
+
+          # Navigate to Gateway repo
+          cd gateway-repo
 
           # Pull latest changes (in case other builds updated the repo)
           git pull --rebase
