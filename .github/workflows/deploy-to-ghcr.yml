@@ -133,6 +133,9 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "GitHub Actions"
 
+          # Pull latest changes first (before creating files)
+          git pull --rebase
+
           # Create manifest directory if not exists
           mkdir -p manifests
 
@@ -158,9 +161,6 @@ jobs:
             }
           }
           EOF
-
-          # Pull latest changes first
-          git pull --rebase
 
           # Commit and push
           git add manifests/${SERVICE_NAME}.json
