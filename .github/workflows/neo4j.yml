@@ -1,149 +1,258 @@
-name: Deploy Neo4j via SSH
+name: Build and Push Neo4j to GHCR
 
 on:
   workflow_call:
+    inputs:
+      no-cache:
+        description: 'Force Docker build without cache'
+        required: false
+        type: boolean
+        default: false
+      tag:
+        description: 'Custom image tag (optional)'
+        required: false
+        type: string
+        default: ''
+  workflow_dispatch:
+    inputs:
+      no-cache:
+        description: 'Force Docker build without cache'
+        required: false
+        type: boolean
+        default: false
+      tag:
+        description: 'Custom image tag (optional)'
+        required: false
+        type: string
+        default: ''
 
 jobs:
-  whitelist:
-    name: Whitelist GitHub Actions IP Ranges
+  build-and-push:
     runs-on: ubuntu-latest
-    steps:
-      - name: Fetch GitHub Actions IP ranges
-        id: actions_cidrs
-        run: |
-          # Fetch CIDRs and clean them
-          curl -s https://api.github.com/meta | jq -r '.actions[]' | grep -v '^$' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$' > actions_cidrs.txt
-          
-          # Check file content for debugging
-          echo "Retrieved CIDRs:"
-          cat actions_cidrs.txt
-          
-          # Check that we have valid CIDRs
-          if [ ! -s actions_cidrs.txt ]; then
-            echo "Error: No valid CIDRs found"
-            exit 1
-          fi
-          
-          # Create comma-separated list (without spaces)
-          cidrs=$(paste -sd, actions_cidrs.txt | tr -d ' ')
-          
-          # Check final format
-          echo "Final format: $cidrs"
-          
-          # Use new syntax for outputs
-          echo "cidrs=$cidrs" >> $GITHUB_OUTPUT
-      
-      - name: Whitelist all GitHub Actions ranges
-        uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
-        with:
-          hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
-          custom_cidrs: ${{ steps.actions_cidrs.outputs.cidrs }}
-          firewall_name: "firewall-github-actions"
-          port: "22"
-          protocol: tcp
-          direction: in
-          description: "github-actions-cidrs-${{ github.run_id }}"
-          cleanup: false
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: whitelist
-    env:
-      NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+    permissions:
+      contents: write
+      packages: write
 
     steps:
-      - name: Start SSH agent
-        uses: webfactory/ssh-agent@v0.4.1
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout Gateway repository for manifests
+        uses: actions/checkout@v4
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          repository: Haku-Sci/Gateway
+          token: ${{ secrets.GATEWAY_TOKEN }}
+          path: gateway-repo
 
-      - name: Add SSH host key
-        run: ssh-keyscan "${{ vars.SSH_HOST }}" >> ~/.ssh/known_hosts
-
-      - name: Deploy Neo4j container via SSH
+      - name: Set service name
+        id: service
         run: |
-          if [ -z "${{ env.NEO4J_PASSWORD }}" ]; then
-            echo "::error::NEO4J_PASSWORD is empty. Aborting deployment."
-            exit 1
+          SERVICE_NAME="libs-neo4j"
+          echo "name=$SERVICE_NAME" >> $GITHUB_OUTPUT
+          echo "Service name: $SERVICE_NAME"
+
+      - name: Generate Docker tags
+        id: meta
+        run: |
+          SERVICE_NAME="${{ steps.service.outputs.name }}"
+          REPO_OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_BASE="ghcr.io/$REPO_OWNER_LOWER/$SERVICE_NAME"
+          BRANCH_TAG="${GITHUB_REF_NAME//\//-}"
+          COMMIT_SHORT="${GITHUB_SHA:0:7}"
+
+          TAGS=""
+
+          # Add custom tag if provided
+          if [ -n "${{ inputs.tag }}" ]; then
+            TAGS="$IMAGE_BASE:${{ inputs.tag }}"
           fi
 
-          ssh -p "${{ vars.SSH_PORT }}" -o StrictHostKeyChecking=no "${{ vars.SSH_USER }}"@"${{ vars.SSH_HOST }}" bash << 'EOF'
-            if docker ps -a --format '{{.Names}}' | grep -qw "neo4j"; then
-              echo "Neo4j container exists — forcing password reset"
+          # Add branch name tag
+          if [ -z "$TAGS" ]; then
+            TAGS="$IMAGE_BASE:$BRANCH_TAG"
+          else
+            TAGS="$TAGS,$IMAGE_BASE:$BRANCH_TAG"
+          fi
 
-              # Stop container
-              docker stop neo4j || true
+          # Add commit SHA tag (short)
+          TAGS="$TAGS,$IMAGE_BASE:$BRANCH_TAG-$COMMIT_SHORT"
 
-              # Mount config and disable auth
-              docker run --rm \
-                -v neo4j_home:/var/lib/neo4j \
-                neo4j:latest sh -c "echo 'dbms.security.auth_enabled=false' >> /var/lib/neo4j/conf/neo4j.conf"
+          # Add latest tag if on main branch
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            TAGS="$TAGS,$IMAGE_BASE:latest"
+          fi
 
-              # Restart container with disabled auth
-              docker start neo4j
+          echo "Tags that will be created:"
+          echo "$TAGS" | tr ',' '\n'
 
-              # Wait for DB to start
-              until docker logs neo4j 2>&1 | grep -q "Bolt enabled"; do sleep 1; done
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+          echo "deploy_tag=$BRANCH_TAG-$COMMIT_SHORT" >> $GITHUB_OUTPUT
 
-              # Change password directly via cypher-shell
-              docker exec neo4j bin/cypher-shell -u neo4j -d system \
-                "ALTER USER neo4j SET PASSWORD '${{ vars.NEO4J_PASSWORD }}';"
-
-              # Stop container again
-              docker stop neo4j
-
-              # Re-enable auth
-              docker run --rm \
-                -v neo4j_home:/var/lib/neo4j \
-                neo4j:latest sh -c "sed -i '/dbms.security.auth_enabled=false/d' /var/lib/neo4j/conf/neo4j.conf"
-
-              # Start normally
-              docker start neo4j
+      - name: Prepare deployment configuration
+        id: deploy_config
+        env:
+          ALL_SECRETS: ${{ toJson(secrets) }}
+          ALL_VARS: ${{ toJson(vars) }}
+        run: |
+          # Prepare environment variables (exclude GITHUB, SSH, DOCKER prefixes)
+          ENV_VARS="{"
+          FIRST=true
+          for key in $(echo "$ALL_VARS" | jq -r 'keys[]'); do
+            if [[ "$key" =~ ^(GITHUB|SSH|DOCKER) ]]; then continue; fi
+            value=$(echo "$ALL_VARS" | jq -r --arg k "$key" '.[$k]')
+            if [ "$FIRST" = true ]; then
+              FIRST=false
             else
-              echo "Deploy new Neo4j container"
-              NETWORK_ARG=""
-              if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
-                docker network inspect "${{ vars.DOCKER_NETWORK }}" > /dev/null 2>&1 || \
-                  docker network create "${{ vars.DOCKER_NETWORK }}"
-                NETWORK_ARG="--network ${{ vars.DOCKER_NETWORK }}"
-              fi
-
-              mkdir -p /opt/neo4j/data
-              docker run -d \
-                --name neo4j \
-                $NETWORK_ARG \
-                -p 7474:7474 -p 7687:7687 \
-                -v /opt/neo4j/data:/data \
-                -e NEO4J_AUTH=neo4j/${NEO4J_PASSWORD} \
-                neo4j:latest
+              ENV_VARS+=","
             fi
+            ENV_VARS+="\"$key\":\"$value\""
+          done
+          for key in $(echo "$ALL_SECRETS" | jq -r 'keys[]'); do
+            if [[ "$key" =~ ^(GITHUB|SSH|DOCKER) ]]; then continue; fi
+            value=$(echo "$ALL_SECRETS" | jq -r --arg k "$key" '.[$k]')
+            if [ "$FIRST" = true ]; then
+              FIRST=false
+            else
+              ENV_VARS+=","
+            fi
+            ENV_VARS+="\"$key\":\"$value\""
+          done
+          ENV_VARS+="}"
+
+          echo "env_vars=$ENV_VARS" >> $GITHUB_OUTPUT
+
+      - name: Update manifest - BUILD STARTED
+        run: |
+          SERVICE_NAME="${{ steps.service.outputs.name }}"
+          DEPLOY_TAG="${{ steps.meta.outputs.deploy_tag }}"
+
+          # Navigate to Gateway repo
+          cd gateway-repo
+
+          # Configure git
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "GitHub Actions"
+
+          # Pull latest changes first (before creating files)
+          git pull --rebase
+
+          # Create manifest directory if not exists
+          mkdir -p manifests
+
+          # Create manifest with status "started"
+          cat > manifests/${SERVICE_NAME}.json <<EOF
+          {
+            "service": "${SERVICE_NAME}",
+            "status": "started",
+            "tag": "${DEPLOY_TAG}",
+            "commit": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "workflow_run_id": "${{ github.run_id }}",
+            "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "repository": "${{ github.repository }}",
+            "deployment": {
+              "target_host": "${{ vars.SSH_HOST }}",
+              "ssh_port": "${{ vars.SSH_PORT || '22' }}",
+              "container_name": "neo4j",
+              "docker_network": "${{ vars.DOCKER_NETWORK }}",
+              "port_mapping": "7474:7474,7687:7687,5005:5005",
+              "environment": ${{ steps.deploy_config.outputs.env_vars }}
+            }
+          }
           EOF
 
-      - name: Show Neo4j status on server
-        run: |
-          ssh -p "${{ vars.SSH_PORT }}" -o StrictHostKeyChecking=no "${{ vars.SSH_USER }}"@"${{ vars.SSH_HOST }}" \
-            "docker ps --filter name=neo4j --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
-      
-  # Clean ips on the server side
-  clean-whitelist:
-    runs-on: ubuntu-latest
-    needs: deploy
-    if: always()
-    steps:
-      - name: Fetch GitHub Actions IP ranges
-        id: actions_cidrs
-        run: |
-          curl -s https://api.github.com/meta | jq -r '.actions[]' > actions_cidrs.txt
-          echo "::set-output name=cidrs::$(paste -sd, actions_cidrs.txt)"
-      
-      - name: Whitelist all GitHub Actions ranges
-        uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
+          # Commit and push
+          git add manifests/${SERVICE_NAME}.json
+          git commit -m "Build started: ${SERVICE_NAME} ${DEPLOY_TAG}"
+          git push
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
         with:
-          hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
-          custom_cidrs: ${{ steps.actions_cidrs.outputs.cidrs }}
-          firewall_name: "firewall-github-actions"
-          port: "22"
-          protocol: tcp
-          direction: in
-          description: "github-actions-cidrs-${{ github.run_id }}"
-          cleanup: false
+          buildkitd-flags: |
+            --allow-insecure-entitlement network.host
+          driver-opts: |
+            network=host
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/neo4j
+          file: ./docker/neo4j/Dockerfile
+          push: true
+          platforms: ${{ vars.DOCKER_PLATFORM || 'linux/amd64' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=${{ github.ref_name }}-neo4j
+          cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-neo4j
+          no-cache: ${{ inputs.no-cache }}
+          allow: network.host
+          network: host
+
+      - name: Update manifest - BUILD READY
+        run: |
+          SERVICE_NAME="${{ steps.service.outputs.name }}"
+          DEPLOY_TAG="${{ steps.meta.outputs.deploy_tag }}"
+
+          # Navigate to Gateway repo
+          cd gateway-repo
+
+          # Pull latest changes (in case other builds updated the repo)
+          git pull --rebase
+
+          # Update manifest with status "ready"
+          cat > manifests/${SERVICE_NAME}.json <<EOF
+          {
+            "service": "${SERVICE_NAME}",
+            "status": "ready",
+            "tag": "${DEPLOY_TAG}",
+            "commit": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "workflow_run_id": "${{ github.run_id }}",
+            "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "repository": "${{ github.repository }}",
+            "deployment": {
+              "target_host": "${{ vars.SSH_HOST }}",
+              "ssh_port": "${{ vars.SSH_PORT || '22' }}",
+              "container_name": "neo4j",
+              "docker_network": "${{ vars.DOCKER_NETWORK }}",
+              "port_mapping": "7474:7474,7687:7687,5005:5005",
+              "environment": ${{ steps.deploy_config.outputs.env_vars }}
+            }
+          }
+          EOF
+
+          # Commit and push
+          git add manifests/${SERVICE_NAME}.json
+          git commit -m "Build ready: ${SERVICE_NAME} ${DEPLOY_TAG}"
+          git push
+
+      - name: Summary
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Service:** ${{ steps.service.outputs.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ✅ Ready for deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Created Tags:" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment:" >> $GITHUB_STEP_SUMMARY
+          echo "Gateway will auto-deploy when all builds are ready." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Manual deployment command:**" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "ssh gateway \"/opt/gateway/deploy.sh ${{ steps.service.outputs.name }} ${{ steps.meta.outputs.deploy_tag }}\"" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
