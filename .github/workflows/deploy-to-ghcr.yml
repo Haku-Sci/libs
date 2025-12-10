@@ -58,7 +58,8 @@ jobs:
         id: meta
         run: |
           SERVICE_NAME="${{ steps.service.outputs.name }}"
-          IMAGE_BASE="ghcr.io/${{ github.repository_owner }}/$SERVICE_NAME"
+          REPO_OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_BASE="ghcr.io/$REPO_OWNER_LOWER/$SERVICE_NAME"
           BRANCH_TAG="${GITHUB_REF_NAME//\//-}"
           COMMIT_SHORT="${GITHUB_SHA:0:7}"
 
