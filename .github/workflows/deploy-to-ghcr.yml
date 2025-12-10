@@ -13,6 +13,11 @@ on:
         required: false
         type: string
         default: ''
+      container:
+        description: 'Container name to deploy (default: app, for graph can be: app or db)'
+        required: false
+        type: string
+        default: 'app'
   workflow_dispatch:
     inputs:
       no-cache:
@@ -25,12 +30,17 @@ on:
         required: false
         type: string
         default: ''
+      container:
+        description: 'Container name to deploy (default: app, for graph can be: app or db)'
+        required: false
+        type: string
+        default: 'app'
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
 
     steps:
@@ -80,6 +90,39 @@ jobs:
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
           echo "deploy_tag=$BRANCH_TAG-$COMMIT_SHORT" >> $GITHUB_OUTPUT
 
+      - name: Prepare deployment configuration
+        id: deploy_config
+        env:
+          ALL_SECRETS: ${{ toJson(secrets) }}
+          ALL_VARS: ${{ toJson(vars) }}
+        run: |
+          # Prepare environment variables (exclude GITHUB, SSH, DOCKER prefixes)
+          ENV_VARS="{"
+          FIRST=true
+          for key in $(echo "$ALL_VARS" | jq -r 'keys[]'); do
+            if [[ "$key" =~ ^(GITHUB|SSH|DOCKER) ]]; then continue; fi
+            value=$(echo "$ALL_VARS" | jq -r --arg k "$key" '.[$k]')
+            if [ "$FIRST" = true ]; then
+              FIRST=false
+            else
+              ENV_VARS+=","
+            fi
+            ENV_VARS+="\"$key\":\"$value\""
+          done
+          for key in $(echo "$ALL_SECRETS" | jq -r 'keys[]'); do
+            if [[ "$key" =~ ^(GITHUB|SSH|DOCKER) ]]; then continue; fi
+            value=$(echo "$ALL_SECRETS" | jq -r --arg k "$key" '.[$k]')
+            if [ "$FIRST" = true ]; then
+              FIRST=false
+            else
+              ENV_VARS+=","
+            fi
+            ENV_VARS+="\"$key\":\"$value\""
+          done
+          ENV_VARS+="}"
+
+          echo "env_vars=$ENV_VARS" >> $GITHUB_OUTPUT
+
       - name: Update manifest - BUILD STARTED
         run: |
           SERVICE_NAME="${{ steps.service.outputs.name }}"
@@ -103,7 +146,15 @@ jobs:
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "workflow_run_id": "${{ github.run_id }}",
             "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-            "repository": "${{ github.repository }}"
+            "repository": "${{ github.repository }}",
+            "deployment": {
+              "target_host": "${{ vars.SSH_HOST }}",
+              "ssh_port": "${{ vars.SSH_PORT || '22' }}",
+              "container_name": "${{ inputs.container || 'app' }}",
+              "docker_network": "${{ vars.DOCKER_NETWORK }}",
+              "port_mapping": "${{ vars.DOCKER_PORT_REDIRECT }}",
+              "environment": ${{ steps.deploy_config.outputs.env_vars }}
+            }
           }
           EOF
 
@@ -174,7 +225,15 @@ jobs:
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "workflow_run_id": "${{ github.run_id }}",
             "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-            "repository": "${{ github.repository }}"
+            "repository": "${{ github.repository }}",
+            "deployment": {
+              "target_host": "${{ vars.SSH_HOST }}",
+              "ssh_port": "${{ vars.SSH_PORT || '22' }}",
+              "container_name": "${{ inputs.container || 'app' }}",
+              "docker_network": "${{ vars.DOCKER_NETWORK }}",
+              "port_mapping": "${{ vars.DOCKER_PORT_REDIRECT }}",
+              "environment": ${{ steps.deploy_config.outputs.env_vars }}
+            }
           }
           EOF
 
