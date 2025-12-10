@@ -1,42 +1,28 @@
-name: Build and Push PostgreSQL to GHCR
+name: Deploy PostgreSQL via Gateway
 
 on:
   workflow_call:
     inputs:
-      no-cache:
-        description: 'Force Docker build without cache'
-        required: false
-        type: boolean
-        default: false
       tag:
-        description: 'Custom image tag (optional)'
+        description: 'PostgreSQL image tag (default: latest)'
         required: false
         type: string
-        default: ''
+        default: 'latest'
   workflow_dispatch:
     inputs:
-      no-cache:
-        description: 'Force Docker build without cache'
-        required: false
-        type: boolean
-        default: false
       tag:
-        description: 'Custom image tag (optional)'
+        description: 'PostgreSQL image tag (default: latest)'
         required: false
         type: string
-        default: ''
+        default: 'latest'
 
 jobs:
-  build-and-push:
+  create-manifest:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Checkout Gateway repository for manifests
         uses: actions/checkout@v4
         with:
@@ -44,49 +30,15 @@ jobs:
           token: ${{ secrets.GATEWAY_TOKEN }}
           path: gateway-repo
 
-      - name: Set service name
+      - name: Set service name and tag
         id: service
         run: |
           SERVICE_NAME="libs-postgresql"
+          IMAGE_TAG="${{ inputs.tag }}"
           echo "name=$SERVICE_NAME" >> $GITHUB_OUTPUT
+          echo "tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
           echo "Service name: $SERVICE_NAME"
-
-      - name: Generate Docker tags
-        id: meta
-        run: |
-          SERVICE_NAME="${{ steps.service.outputs.name }}"
-          REPO_OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE_BASE="ghcr.io/$REPO_OWNER_LOWER/$SERVICE_NAME"
-          BRANCH_TAG="${GITHUB_REF_NAME//\//-}"
-          COMMIT_SHORT="${GITHUB_SHA:0:7}"
-
-          TAGS=""
-
-          # Add custom tag if provided
-          if [ -n "${{ inputs.tag }}" ]; then
-            TAGS="$IMAGE_BASE:${{ inputs.tag }}"
-          fi
-
-          # Add branch name tag
-          if [ -z "$TAGS" ]; then
-            TAGS="$IMAGE_BASE:$BRANCH_TAG"
-          else
-            TAGS="$TAGS,$IMAGE_BASE:$BRANCH_TAG"
-          fi
-
-          # Add commit SHA tag (short)
-          TAGS="$TAGS,$IMAGE_BASE:$BRANCH_TAG-$COMMIT_SHORT"
-
-          # Add latest tag if on main branch
-          if [ "$GITHUB_REF_NAME" = "main" ]; then
-            TAGS="$TAGS,$IMAGE_BASE:latest"
-          fi
-
-          echo "Tags that will be created:"
-          echo "$TAGS" | tr ',' '\n'
-
-          echo "tags=$TAGS" >> $GITHUB_OUTPUT
-          echo "deploy_tag=$BRANCH_TAG-$COMMIT_SHORT" >> $GITHUB_OUTPUT
+          echo "Image tag: $IMAGE_TAG"
 
       - name: Prepare deployment configuration
         id: deploy_config
@@ -97,6 +49,8 @@ jobs:
           # Prepare environment variables (exclude GITHUB, SSH, DOCKER prefixes)
           ENV_VARS="{"
           FIRST=true
+
+          # Add PostgreSQL specific variables
           for key in $(echo "$ALL_VARS" | jq -r 'keys[]'); do
             if [[ "$key" =~ ^(GITHUB|SSH|DOCKER) ]]; then continue; fi
             value=$(echo "$ALL_VARS" | jq -r --arg k "$key" '.[$k]')
@@ -107,6 +61,7 @@ jobs:
             fi
             ENV_VARS+="\"$key\":\"$value\""
           done
+
           for key in $(echo "$ALL_SECRETS" | jq -r 'keys[]'); do
             if [[ "$key" =~ ^(GITHUB|SSH|DOCKER) ]]; then continue; fi
             value=$(echo "$ALL_SECRETS" | jq -r --arg k "$key" '.[$k]')
@@ -117,14 +72,22 @@ jobs:
             fi
             ENV_VARS+="\"$key\":\"$value\""
           done
-          ENV_VARS+="}"
 
+          # Add PostgreSQL specific environment variables from secrets
+          if [ "$FIRST" = false ]; then
+            ENV_VARS+=","
+          fi
+          ENV_VARS+="\"POSTGRES_USER\":\"${{ vars.POSTGRESQL_USER }}\""
+          ENV_VARS+=",\"POSTGRES_PASSWORD\":\"${{ secrets.POSTGRESQL_PASSWORD }}\""
+          ENV_VARS+=",\"POSTGRES_DB\":\"${{ github.event.repository.name }}\""
+
+          ENV_VARS+="}"
           echo "env_vars=$ENV_VARS" >> $GITHUB_OUTPUT
 
-      - name: Update manifest - BUILD STARTED
+      - name: Create manifest in Gateway
         run: |
           SERVICE_NAME="${{ steps.service.outputs.name }}"
-          DEPLOY_TAG="${{ steps.meta.outputs.deploy_tag }}"
+          IMAGE_TAG="${{ steps.service.outputs.tag }}"
 
           # Navigate to Gateway repo
           cd gateway-repo
@@ -133,88 +96,19 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "GitHub Actions"
 
-          # Pull latest changes first (before creating files)
+          # Pull latest changes first
           git pull --rebase
 
           # Create manifest directory if not exists
           mkdir -p manifests
 
-          # Create manifest with status "started"
-          cat > manifests/${SERVICE_NAME}.json <<EOF
-          {
-            "service": "${SERVICE_NAME}",
-            "status": "started",
-            "tag": "${DEPLOY_TAG}",
-            "commit": "${{ github.sha }}",
-            "branch": "${{ github.ref_name }}",
-            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "workflow_run_id": "${{ github.run_id }}",
-            "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-            "repository": "${{ github.repository }}",
-            "deployment": {
-              "target_host": "${{ vars.SSH_HOST }}",
-              "ssh_port": "${{ vars.SSH_PORT || '22' }}",
-              "container_name": "postgresql",
-              "docker_network": "${{ vars.DOCKER_NETWORK }}",
-              "port_mapping": "5432:5432",
-              "environment": ${{ steps.deploy_config.outputs.env_vars }}
-            }
-          }
-          EOF
-
-          # Commit and push
-          git add manifests/${SERVICE_NAME}.json
-          git commit -m "Build started: ${SERVICE_NAME} ${DEPLOY_TAG}"
-          git push
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          buildkitd-flags: |
-            --allow-insecure-entitlement network.host
-          driver-opts: |
-            network=host
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./docker/postgresql
-          file: ./docker/postgresql/Dockerfile
-          push: true
-          platforms: ${{ vars.DOCKER_PLATFORM || 'linux/amd64' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha,scope=${{ github.ref_name }}-postgresql
-          cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-postgresql
-          no-cache: ${{ inputs.no-cache }}
-          allow: network.host
-          network: host
-
-      - name: Update manifest - BUILD READY
-        run: |
-          SERVICE_NAME="${{ steps.service.outputs.name }}"
-          DEPLOY_TAG="${{ steps.meta.outputs.deploy_tag }}"
-
-          # Navigate to Gateway repo
-          cd gateway-repo
-
-          # Pull latest changes (in case other builds updated the repo)
-          git pull --rebase
-
-          # Update manifest with status "ready"
+          # Create manifest with status "ready" (no build required for official images)
           cat > manifests/${SERVICE_NAME}.json <<EOF
           {
             "service": "${SERVICE_NAME}",
             "status": "ready",
-            "tag": "${DEPLOY_TAG}",
-            "commit": "${{ github.sha }}",
-            "branch": "${{ github.ref_name }}",
+            "image": "postgres:${IMAGE_TAG}",
+            "tag": "${IMAGE_TAG}",
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "workflow_run_id": "${{ github.run_id }}",
             "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
@@ -225,6 +119,7 @@ jobs:
               "container_name": "postgresql",
               "docker_network": "${{ vars.DOCKER_NETWORK }}",
               "port_mapping": "5432:5432",
+              "volumes": "/opt/postgres/data:/var/lib/postgresql/data",
               "environment": ${{ steps.deploy_config.outputs.env_vars }}
             }
           }
@@ -232,27 +127,21 @@ jobs:
 
           # Commit and push
           git add manifests/${SERVICE_NAME}.json
-          git commit -m "Build ready: ${SERVICE_NAME} ${DEPLOY_TAG}"
+          git commit -m "Deploy ready: ${SERVICE_NAME} with image postgres:${IMAGE_TAG}"
           git push
 
       - name: Summary
         run: |
-          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Service:** ${{ steps.service.outputs.name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** postgres:${{ steps.service.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
           echo "**Status:** ✅ Ready for deployment" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Created Tags:" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Deployment:" >> $GITHUB_STEP_SUMMARY
-          echo "Gateway will auto-deploy when all builds are ready." >> $GITHUB_STEP_SUMMARY
+          echo "Gateway will auto-deploy when manifest is processed." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Manual deployment command:**" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "ssh gateway \"/opt/gateway/deploy.sh ${{ steps.service.outputs.name }} ${{ steps.meta.outputs.deploy_tag }}\"" >> $GITHUB_STEP_SUMMARY
+          echo "ssh gateway \"/opt/gateway/deploy.sh ${{ steps.service.outputs.name }}\"" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
