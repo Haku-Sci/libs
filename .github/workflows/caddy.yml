@@ -1,204 +1,166 @@
-name: Deploy Caddy via SSH with templated Caddyfile
+name: Deploy Caddy via Gateway
+
 on:
   workflow_call:
+    inputs:
+      tag:
+        description: 'Caddy image tag (default: 2-alpine)'
+        required: false
+        type: string
+        default: '2-alpine'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Caddy image tag (default: 2-alpine)'
+        required: false
+        type: string
+        default: '2-alpine'
+
 jobs:
-  whitelist:
-    if: false
-    name: Whitelist GitHub Actions IP Ranges
+  create-manifest:
     runs-on: ubuntu-latest
-    steps:
-      - name: Fetch and prepare GitHub Actions IP ranges
-        id: actions_cidrs
-        run: |
-          set -euo pipefail
+    permissions:
+      contents: write
 
-          # -----------------------------------------
-          # 1) Fetch .actions from GitHub meta and
-          #    validate using Python's ipaddress module.
-          #    Python prints CSV to stdout, and debug to stderr.
-          # -----------------------------------------
-          cidrs=$(
-            curl -sS https://api.github.com/meta | python3 - <<'PY'
-          import sys, json, ipaddress
-          data = json.load(sys.stdin)
-          arr = data.get("actions", []) or []
-
-          valid = set()
-          invalid = []
-          for entry in arr:
-              if not isinstance(entry, str):
-                  invalid.append(str(entry))
-                  continue
-              s = entry.strip()
-              try:
-                  # strict=False accepts host/net forms like 1.2.3.4/32
-                  net = ipaddress.ip_network(s, strict=False)
-                  # keep both IPv4 and IPv6 if you want; here we keep IPv4 and IPv6
-                  valid.add(str(net))
-              except Exception:
-                  invalid.append(s)
-
-          # stable sort: by IP bytes then prefix length
-          def sort_key(x):
-              ip, mask = x.split('/')
-              if ':' in ip:           # IPv6: sort by hextets then mask
-                  parts = [int(h,16) for h in ip.split(':') if h!='']
-                  return parts + [int(mask)]
-              else:
-                  parts = [int(p) for p in ip.split('.')]
-                  return parts + [int(mask)]
-
-          outs = sorted(valid, key=sort_key)
-          # print CSV to stdout (captured by bash)
-          print(",".join(outs))
-
-          # print debug info to stderr (visible in job logs)
-          print(f"VALID_COUNT={len(outs)}", file=sys.stderr)
-          print(f"INVALID_COUNT={len(invalid)}", file=sys.stderr)
-          if invalid:
-              print("SAMPLE_INVALID:", file=sys.stderr)
-              for i in invalid[:20]:
-                  print(i, file=sys.stderr)
-          PY
-                  )
-
-                  # -----------------------------------------
-                  # 2) Basic sanity checks in bash
-                  # -----------------------------------------
-                  echo "DEBUG: raw CIDR string length (chars): ${#cidrs}"
-                  if [ -z "$cidrs" ]; then
-                    echo "Error: no valid CIDRs found" >&2
-                    exit 1
-                  fi
-
-                  # ensure there are no empty items (this was the original cause)
-                  bad=$(echo "$cidrs" | tr ',' '\n' | grep -vE '^[0-9a-fA-F:.]+/[0-9]+$' || true)
-                  if [ -n "$bad" ]; then
-                    echo "Error: One or more elements failed the final regex check:" >&2
-                    echo "$bad" >&2
-                    exit 1
-                  fi
-
-                  # show how many CIDRs we will pass
-                  echo "Final CIDR count: $(echo "$cidrs" | tr ',' '\n' | wc -l)"
-
-                  # -----------------------------------------
-                  # 3) Export to GitHub Actions output
-                  # -----------------------------------------
-                  echo "cidrs=$cidrs" >> "$GITHUB_OUTPUT"
-
-      - name: Whitelist all GitHub Actions ranges
-        uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
-        with:
-          hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
-          custom_cidrs: ${{ steps.actions_cidrs.outputs.cidrs }}
-          firewall_name: "firewall-github-actions"
-          port: "22"
-          protocol: tcp
-          direction: in
-          description: "github-actions-cidrs-${{ github.run_id }}"
-          cleanup: false
-
-      - name: Wait for firewall rules to apply
-        run: |
-          echo "Waiting for firewall rules to apply..."
-          sleep 10
-          echo "Firewall rules should now be active"
-
-
-  
-  deploy:
-    runs-on: ubuntu-latest
-    #needs: whitelist
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
-      
-      - name: Start ssh-agent
-        uses: webfactory/ssh-agent@v0.4.1
+        uses: actions/checkout@v4
+
+      - name: Checkout Gateway repository for manifests
+        uses: actions/checkout@v4
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-      
-      - name: Add SSH host key
+          repository: Haku-Sci/Gateway
+          token: ${{ secrets.GATEWAY_TOKEN }}
+          path: gateway-repo
+
+      - name: Set service name and tag
+        id: service
         run: |
-          mkdir -p ~/.ssh
-          echo "Scanning SSH host key for ${{ vars.SSH_HOST }}:${{ vars.SSH_PORT }}"
-          ssh-keyscan -p ${{ vars.SSH_PORT }} ${{ vars.SSH_HOST }} 2>&1 | tee -a ~/.ssh/known_hosts
-          echo "SSH host key added successfully"
-      
-      - name: Copy templated Caddyfile to remote
+          SERVICE_NAME="libs-caddy"
+          IMAGE_TAG="${{ inputs.tag }}"
+          echo "name=$SERVICE_NAME" >> $GITHUB_OUTPUT
+          echo "tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "Service name: $SERVICE_NAME"
+          echo "Image tag: $IMAGE_TAG"
+
+      - name: Prepare Caddyfile configuration
+        id: caddyfile
         run: |
-          scp -P ${{ vars.SSH_PORT }} Caddyfile ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }}:/tmp/Caddyfile
-      
-      - name: Deploy Caddy container via SSH
-        run: |
-          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} bash << 'EOF'
-            if docker ps -a --format '{{.Names}}' | grep -qw "caddy"; then
-              docker rm -f caddy
-            fi
-            mkdir -p /opt/caddy/config /opt/caddy/data
-            mv /tmp/Caddyfile /opt/caddy/config/Caddyfile
-            docker run -d \
-              --name caddy \
-              -p 80:80 -p 443:443 \
-              -v /opt/caddy/config/Caddyfile:/etc/caddy/Caddyfile:ro \
-              -v /opt/caddy/data:/data \
-              caddy:2-alpine
-          EOF
-  
-  # Clean ips on the server side
-  clean-whitelist:
-    runs-on: ubuntu-latest
-    needs: deploy
-    if: false
-    #if: always()
-    steps:
-      - name: Fetch GitHub Actions IP ranges
-        id: actions_cidrs
-        run: |
-          # Fetch CIDRs and clean them thoroughly
-          curl -s https://api.github.com/meta | jq -r '.actions[]' | \
-            grep -v '^$' | \
-            grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$' | \
-            sort -u > actions_cidrs.txt
-          
-          # Check file content for debugging
-          echo "Retrieved CIDRs:"
-          cat actions_cidrs.txt
-          echo "Total count: $(wc -l < actions_cidrs.txt)"
-          
-          # Check that we have valid CIDRs
-          if [ ! -s actions_cidrs.txt ]; then
-            echo "Error: No valid CIDRs found"
-            exit 1
+          # Check if Caddyfile exists in the repo
+          if [ -f "Caddyfile" ]; then
+            echo "Using Caddyfile from repository"
+            CADDYFILE_CONTENT=$(cat Caddyfile | jq -Rs .)
+          else
+            echo "No Caddyfile found, using default configuration"
+            CADDYFILE_CONTENT=$(cat <<'CADDY' | jq -Rs .
+          {
+            admin off
+          }
+
+          :80 {
+            respond "Caddy is running"
+          }
+          CADDY
+          )
           fi
-          
-          # Create comma-separated list (without spaces) and remove any trailing commas
-          cidrs=$(paste -sd, actions_cidrs.txt | sed 's/,$//' | tr -d ' \t\n\r')
-          
-          # Verify no empty elements
-          echo "Checking for empty elements..."
-          echo "$cidrs" | tr ',' '\n' | while read cidr; do
-            if [ -z "$cidr" ]; then
-              echo "Warning: Found empty CIDR element"
+          echo "caddyfile=$CADDYFILE_CONTENT" >> $GITHUB_OUTPUT
+
+      - name: Prepare deployment configuration
+        id: deploy_config
+        env:
+          ALL_SECRETS: ${{ toJson(secrets) }}
+          ALL_VARS: ${{ toJson(vars) }}
+        run: |
+          # Prepare environment variables (exclude GITHUB, SSH, DOCKER prefixes)
+          ENV_VARS="{"
+          FIRST=true
+
+          for key in $(echo "$ALL_VARS" | jq -r 'keys[]'); do
+            if [[ "$key" =~ ^(GITHUB|SSH|DOCKER) ]]; then continue; fi
+            value=$(echo "$ALL_VARS" | jq -r --arg k "$key" '.[$k]')
+            if [ "$FIRST" = true ]; then
+              FIRST=false
+            else
+              ENV_VARS+=","
             fi
+            ENV_VARS+="\"$key\":\"$value\""
           done
-          
-          # Check final format
-          echo "Final format: $cidrs"
-          echo "Final length: ${#cidrs}"
-          
-          # Use new syntax for outputs
-          echo "cidrs=$cidrs" >> $GITHUB_OUTPUT
-      
-      - name: Clean GitHub Actions IP ranges from whitelist
-        uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
-        with:
-          hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
-          custom_cidrs: ${{ steps.actions_cidrs.outputs.cidrs }}
-          firewall_name: "firewall-github-actions"
-          port: "22"
-          protocol: tcp
-          direction: in
-          description: "github-actions-cidrs-${{ github.run_id }}"
-          cleanup: true
+
+          for key in $(echo "$ALL_SECRETS" | jq -r 'keys[]'); do
+            if [[ "$key" =~ ^(GITHUB|SSH|DOCKER|GATEWAY) ]]; then continue; fi
+            value=$(echo "$ALL_SECRETS" | jq -r --arg k "$key" '.[$k]')
+            if [ "$FIRST" = true ]; then
+              FIRST=false
+            else
+              ENV_VARS+=","
+            fi
+            ENV_VARS+="\"$key\":\"$value\""
+          done
+
+          ENV_VARS+="}"
+          echo "env_vars=$ENV_VARS" >> $GITHUB_OUTPUT
+
+      - name: Create manifest in Gateway
+        run: |
+          SERVICE_NAME="${{ steps.service.outputs.name }}"
+          IMAGE_TAG="${{ steps.service.outputs.tag }}"
+
+          # Navigate to Gateway repo
+          cd gateway-repo
+
+          # Configure git
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "GitHub Actions"
+
+          # Pull latest changes first
+          git pull --rebase
+
+          # Create manifest directory if not exists
+          mkdir -p manifests
+
+          # Create manifest with status "ready" (no build required for official images)
+          cat > manifests/${SERVICE_NAME}.json <<EOF
+          {
+            "service": "${SERVICE_NAME}",
+            "status": "ready",
+            "image": "caddy:${IMAGE_TAG}",
+            "tag": "${IMAGE_TAG}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "workflow_run_id": "${{ github.run_id }}",
+            "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "repository": "${{ github.repository }}",
+            "deployment": {
+              "target_host": "${{ vars.SSH_HOST }}",
+              "ssh_port": "${{ vars.SSH_PORT || '22' }}",
+              "container_name": "caddy",
+              "docker_network": "${{ vars.DOCKER_NETWORK }}",
+              "port_mapping": "80:80,443:443",
+              "volumes": "/opt/caddy/config:/etc/caddy,/opt/caddy/data:/data",
+              "environment": ${{ steps.deploy_config.outputs.env_vars }},
+              "config_files": {
+                "Caddyfile": ${{ steps.caddyfile.outputs.caddyfile }}
+              }
+            }
+          }
+          EOF
+
+          # Commit and push
+          git add manifests/${SERVICE_NAME}.json
+          git commit -m "Deploy ready: ${SERVICE_NAME} with image caddy:${IMAGE_TAG}"
+          git push
+
+      - name: Summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Service:** ${{ steps.service.outputs.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** caddy:${{ steps.service.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ✅ Ready for deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment:" >> $GITHUB_STEP_SUMMARY
+          echo "Gateway will auto-deploy when manifest is processed." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Manual deployment command:**" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "ssh gateway \"/opt/gateway/deploy.sh ${{ steps.service.outputs.name }}\"" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
