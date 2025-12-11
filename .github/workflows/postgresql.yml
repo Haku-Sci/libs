@@ -1,135 +1,146 @@
-name: Deploy PostgreSQL via Gateway
+name: Deploy PostgreSQL via SSH
 
 on:
   workflow_call:
     inputs:
-      tag:
-        description: 'PostgreSQL image tag (default: latest)'
+      public-host:
+        description: 'Override for SSH_HOST variable'
         required: false
         type: string
-        default: 'latest'
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'PostgreSQL image tag (default: latest)'
-        required: false
-        type: string
-        default: 'latest'
 
 jobs:
-  create-manifest:
+  whitelist:
+    name: Whitelist GitHub Actions IP Ranges
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
     steps:
-      - name: Checkout Gateway repository for manifests
-        uses: actions/checkout@v4
+      - name: Fetch GitHub Actions IP ranges
+        id: actions_cidrs
+        run: |
+          # Fetch CIDRs and clean them
+          curl -s https://api.github.com/meta | jq -r '.actions[]' | grep -v '^$' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$' > actions_cidrs.txt
+          
+          # Check file content for debugging
+          echo "Retrieved CIDRs:"
+          cat actions_cidrs.txt
+          
+          # Check that we have valid CIDRs
+          if [ ! -s actions_cidrs.txt ]; then
+            echo "Error: No valid CIDRs found"
+            exit 1
+          fi
+          
+          # Create comma-separated list (without spaces)
+          cidrs=$(paste -sd, actions_cidrs.txt | tr -d ' ')
+          
+          # Check final format
+          echo "Final format: $cidrs"
+          
+          # Use new syntax for outputs
+          echo "cidrs=$cidrs" >> $GITHUB_OUTPUT
+      
+      - name: Whitelist all GitHub Actions ranges
+        uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
         with:
-          repository: Haku-Sci/Gateway
-          token: ${{ secrets.GATEWAY_TOKEN }}
-          path: gateway-repo
+          hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
+          custom_cidrs: ${{ steps.actions_cidrs.outputs.cidrs }}
+          firewall_name: "firewall-github-actions"
+          port: "22"
+          protocol: tcp
+          direction: in
+          description: "github-actions-cidrs-${{ github.run_id }}"
+          cleanup: false
 
-      - name: Set service name and tag
-        id: service
+  deploy:
+    runs-on: ubuntu-latest
+    needs: whitelist
+    env:
+      POSTGRES_ADMIN: ${{ vars.POSTGRESQL_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRESQL_PASSWORD }}
+      DB_NAME: ${{ github.event.repository.name }}
+    steps:
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.4.1
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy PostgreSQL container via SSH
         run: |
-          SERVICE_NAME="libs-postgresql"
-          IMAGE_TAG="${{ inputs.tag }}"
-          echo "name=$SERVICE_NAME" >> $GITHUB_OUTPUT
-          echo "tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
-          echo "Service name: $SERVICE_NAME"
-          echo "Image tag: $IMAGE_TAG"
+          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ inputs.public-host || vars.SSH_HOST }} bash << 'EOF'
+            # Stop & remove existing container
+            if docker ps -a --format '{{.Names}}' | grep -qw "postgres"; then
+              docker rm -f postgres || true
+            fi
 
-      - name: Prepare deployment configuration
-        id: deploy_config
-        env:
-          ALL_SECRETS: ${{ toJson(secrets) }}
-          ALL_VARS: ${{ toJson(vars) }}
-          POSTGRESQL_USER: ${{ vars.POSTGRESQL_USER }}
-          POSTGRESQL_PASSWORD: ${{ secrets.POSTGRESQL_PASSWORD }}
-          REPO_NAME: ${{ github.event.repository.name }}
-        run: |
-          # Prepare environment variables (exclude GITHUB, SSH, DOCKER prefixes)
-          # Use jq to properly handle special characters and newlines
-          ENV_VARS=$(jq -n \
-            --argjson vars "$ALL_VARS" \
-            --argjson secrets "$ALL_SECRETS" \
-            --arg pg_user "$POSTGRESQL_USER" \
-            --arg pg_pwd "$POSTGRESQL_PASSWORD" \
-            --arg pg_db "$REPO_NAME" \
-            '
-            ($vars | to_entries | map(select(.key | test("^(GITHUB|SSH|DOCKER)") | not)) | from_entries) +
-            ($secrets | to_entries | map(select(.key | test("^(GITHUB|SSH|DOCKER)") | not)) | from_entries) +
-            {
-              "POSTGRES_USER": $pg_user,
-              "POSTGRES_PASSWORD": $pg_pwd,
-              "POSTGRES_DB": $pg_db
-            }
-            ')
+            # Ensure data directory exists
+            mkdir -p /opt/postgres/data
 
-          # Use heredoc for multiline output to handle special characters
-          echo "env_vars<<EOF" >> $GITHUB_OUTPUT
-          echo "$ENV_VARS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+            NETWORK_ARG=""
+            if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
+              if ! docker network inspect "${{ vars.DOCKER_NETWORK }}" > /dev/null 2>&1; then
+                echo "Create Docker network: ${{ vars.DOCKER_NETWORK }}"
+                docker network create "${{ vars.DOCKER_NETWORK }}" || true
+              fi
+              NETWORK_ARG="--network ${{ vars.DOCKER_NETWORK }}"
+            fi
 
-      - name: Create manifest in Gateway
-        run: |
-          SERVICE_NAME="${{ steps.service.outputs.name }}"
-          IMAGE_TAG="${{ steps.service.outputs.tag }}"
+            if docker ps -a --format '{{.Names}}' | grep -qw "postgresql"; then
+              echo "deleting existing PostgreSQL container" 
+              docker rm -f postgresql || true
+            fi
 
-          # Navigate to Gateway repo
-          cd gateway-repo
+            # Run PostgreSQL container with admin user/password and database
+            docker run -d \
+              --name postgresql \
+              $NETWORK_ARG \
+              -p 5432:5432 \
+              -v /opt/postgres/data:/var/lib/postgresql/data \
+              -e POSTGRES_USER="${{ env.POSTGRES_ADMIN }}" \
+              -e POSTGRES_PASSWORD="${{ env.POSTGRES_PASSWORD }}" \
+              -e POSTGRES_DB="${{ env.DB_NAME }}" \
+              postgres:latest
+            RC=$?
+            if [ $RC -ne 0 ]; then
+              docker logs postgresql || true
+              exit $RC
+            else
+              echo "PostgreSQL container starting with name 'postgresql'."
+              # Wait for PostgreSQL to be ready
+              until docker logs postgresql 2>&1 | { grep -E -qi 'ready' && exit 0; grep -E -qi 'error' && exit 1; false; }; do sleep 1; done
 
-          # Configure git
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "GitHub Actions"
+              echo "PostgreSQL container started"
 
-          # Pull latest changes first
-          git pull --rebase
-
-          # Create manifest directory if not exists
-          mkdir -p manifests
-
-          # Create manifest with status "ready" (no build required for official images)
-          cat > manifests/${SERVICE_NAME}.json <<EOF
-          {
-            "service": "${SERVICE_NAME}",
-            "status": "ready",
-            "image": "postgres:${IMAGE_TAG}",
-            "tag": "${IMAGE_TAG}",
-            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "workflow_run_id": "${{ github.run_id }}",
-            "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-            "repository": "${{ github.repository }}",
-            "deployment": {
-              "target_host": "${{ vars.SSH_HOST }}",
-              "ssh_port": "${{ vars.SSH_PORT || '22' }}",
-              "container_name": "postgresql",
-              "docker_network": "${{ vars.DOCKER_NETWORK }}",
-              "port_mapping": "5432:5432",
-              "volumes": "/opt/postgres/data:/var/lib/postgresql/data",
-              "environment": ${{ steps.deploy_config.outputs.env_vars }}
-            }
-          }
+              # Set the password for the admin user
+              docker exec -i postgresql psql -U "${{ env.POSTGRES_ADMIN }}" -d "${{ env.DB_NAME }}" << 'SQL'
+                ALTER USER "${{ env.POSTGRES_ADMIN }}" WITH PASSWORD '${{ env.POSTGRES_PASSWORD }}';
+          SQL
+          fi
           EOF
 
-          # Commit and push
-          git add manifests/${SERVICE_NAME}.json
-          git commit -m "Deploy ready: ${SERVICE_NAME} with image postgres:${IMAGE_TAG}"
-          git push
-
-      - name: Summary
+      - name: Show PostgreSQL status on server
         run: |
-          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Service:** ${{ steps.service.outputs.name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** postgres:${{ steps.service.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Status:** ✅ Ready for deployment" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Deployment:" >> $GITHUB_STEP_SUMMARY
-          echo "Gateway will auto-deploy when manifest is processed." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Manual deployment command:**" >> $GITHUB_STEP_SUMMARY
-          echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "ssh gateway \"/opt/gateway/deploy.sh ${{ steps.service.outputs.name }}\"" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ inputs.public-host || vars.SSH_HOST }} \
+            "docker ps --filter name=postgres --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
+      
+  # Clean ips on the server side
+  clean-whitelist:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+    steps:
+      - name: Fetch GitHub Actions IP ranges
+        id: actions_cidrs
+        run: |
+          curl -s https://api.github.com/meta | jq -r '.actions[]' > actions_cidrs.txt
+          echo "::set-output name=cidrs::$(paste -sd, actions_cidrs.txt)"
+      
+      - name: Whitelist all GitHub Actions ranges
+        uses: adnanjaw/ip-whitelist-on-hetznerfw@v2
+        with:
+          hetzner_api_key: ${{ secrets.HETZNER_FIREWALL_API_TOKEN }}
+          custom_cidrs: ${{ steps.actions_cidrs.outputs.cidrs }}
+          firewall_name: "firewall-github-actions"
+          port: "22"
+          protocol: tcp
+          direction: in
+          description: "github-actions-cidrs-${{ github.run_id }}"
+          cleanup: false

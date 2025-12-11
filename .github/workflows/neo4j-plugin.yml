@@ -1,0 +1,121 @@
+name: Build and Publish Neo4j Plugin
+
+on:
+  workflow_call:
+    inputs:
+      public-host:
+        description: 'Override for SSH_HOST variable'
+        required: false
+        type: string
+  
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-plugin:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Build plugin JAR
+        run: |
+          cd plugins
+          mvn clean package
+
+      - name: Verify JAR exists
+        run: |
+          if [ ! -f plugins/target/graph-libs-1.0.jar ]; then
+            echo "ERROR: JAR file not found at plugins/target/graph-libs-1.0.jar"
+            ls -la plugins/target/
+            exit 1
+          fi
+          echo "JAR file size: $(du -h plugins/target/graph-libs-1.0.jar | cut -f1)"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+
+      - name: Build and push plugin image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.plugin
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Extract short tag
+        id: extract_tag
+        run: |
+          # Extract the main-<sha> format tag
+          TAG=$(echo "${{ steps.meta.outputs.tags }}" | grep -o "${GITHUB_REF_NAME}-[a-f0-9]\{7\}" | head -1)
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Plugin image tag: ${TAG}"
+
+      - name: Update Gateway manifest
+        env:
+          GATEWAY_TOKEN: ${{ secrets.GATEWAY_TOKEN }}
+        run: |
+          # Extract the short SHA tag
+          TAG="${{ steps.extract_tag.outputs.tag }}"
+
+          # Clone Gateway repo
+          git clone https://${GATEWAY_TOKEN}@github.com/Haku-Sci/Gateway.git gateway-repo
+          cd gateway-repo
+
+          # Update the plugin manifest
+          cat > manifests/libs-neo4j-plugin.json <<EOF
+          {
+            "service": "libs-neo4j-plugin",
+            "type": "plugin",
+            "status": "ready",
+            "tag": "${TAG}",
+            "plugin": {
+              "target_container": "neo4j",
+              "jar_filename": "graph-libs-1.0.jar",
+              "install_path": "/var/lib/neo4j/plugins/"
+            },
+            "commit": "${GITHUB_SHA}",
+            "branch": "${GITHUB_REF_NAME}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "workflow_run_id": "${GITHUB_RUN_ID}",
+            "workflow_run_url": "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}",
+            "repository": "${GITHUB_REPOSITORY}",
+            "deployment": {
+              "target_host": "${{ inputs.public-host || vars.SSH_HOST }}",
+              "ssh_port": "${{ vars.SSH_PORT || '22' }}",
+              "requires_restart": true
+            }
+          }
+          EOF
+
+          # Commit and push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifests/libs-neo4j-plugin.json
+          git commit -m "Plugin ready: libs-neo4j-plugin commit ${GITHUB_SHA:0:7}"
+          git push
