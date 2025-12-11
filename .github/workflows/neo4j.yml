@@ -45,45 +45,24 @@ jobs:
         env:
           ALL_SECRETS: ${{ toJson(secrets) }}
           ALL_VARS: ${{ toJson(vars) }}
+          NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
         run: |
           # Prepare environment variables (exclude GITHUB, SSH, DOCKER prefixes)
-          ENV_VARS="{"
-          FIRST=true
+          # Use jq to properly handle special characters and newlines
+          ENV_VARS=$(jq -n \
+            --argjson vars "$ALL_VARS" \
+            --argjson secrets "$ALL_SECRETS" \
+            --arg neo4j_pwd "$NEO4J_PASSWORD" \
+            '
+            ($vars | to_entries | map(select(.key | test("^(GITHUB|SSH|DOCKER)") | not)) | from_entries) +
+            ($secrets | to_entries | map(select(.key | test("^(GITHUB|SSH|DOCKER)") | not)) | from_entries) +
+            (if $neo4j_pwd != "" then {"NEO4J_AUTH": ("neo4j/" + $neo4j_pwd)} else {} end)
+            ')
 
-          # Add NEO4J specific variables
-          for key in $(echo "$ALL_VARS" | jq -r 'keys[]'); do
-            if [[ "$key" =~ ^(GITHUB|SSH|DOCKER) ]]; then continue; fi
-            value=$(echo "$ALL_VARS" | jq -r --arg k "$key" '.[$k]')
-            if [ "$FIRST" = true ]; then
-              FIRST=false
-            else
-              ENV_VARS+=","
-            fi
-            ENV_VARS+="\"$key\":\"$value\""
-          done
-
-          for key in $(echo "$ALL_SECRETS" | jq -r 'keys[]'); do
-            if [[ "$key" =~ ^(GITHUB|SSH|DOCKER) ]]; then continue; fi
-            value=$(echo "$ALL_SECRETS" | jq -r --arg k "$key" '.[$k]')
-            if [ "$FIRST" = true ]; then
-              FIRST=false
-            else
-              ENV_VARS+=","
-            fi
-            ENV_VARS+="\"$key\":\"$value\""
-          done
-
-          # Add NEO4J_AUTH from secret if available
-          if [ -n "${{ secrets.NEO4J_PASSWORD }}" ]; then
-            if [ "$FIRST" = false ]; then
-              ENV_VARS+=","
-            fi
-            ENV_VARS+="\"NEO4J_AUTH\":\"neo4j/${{ secrets.NEO4J_PASSWORD }}\""
-            FIRST=false
-          fi
-
-          ENV_VARS+="}"
-          echo "env_vars=$ENV_VARS" >> $GITHUB_OUTPUT
+          # Use heredoc for multiline output to handle special characters
+          echo "env_vars<<EOF" >> $GITHUB_OUTPUT
+          echo "$ENV_VARS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create manifest in Gateway
         run: |
