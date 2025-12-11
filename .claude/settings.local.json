@@ -7,6 +7,6 @@
       "Bash(cat:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)"
-    ]
+   ]
   }
 }
