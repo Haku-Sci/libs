@@ -3,7 +3,7 @@ name: Deploy PostgreSQL via SSH
 on:
   workflow_call:
     inputs:
-      public-host:
+      SSH_HOST:
         description: 'Override for SSH_HOST variable'
         required: false
         type: string
@@ -65,7 +65,7 @@ jobs:
 
       - name: Deploy PostgreSQL container via SSH
         run: |
-          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ inputs.public-host || vars.SSH_HOST }} bash << 'EOF'
+          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ inputs.SSH_HOST || vars.SSH_HOST }} bash << 'EOF'
             # Stop & remove existing container
             if docker ps -a --format '{{.Names}}' | grep -qw "postgres"; then
               docker rm -f postgres || true
@@ -118,7 +118,7 @@ jobs:
 
       - name: Show PostgreSQL status on server
         run: |
-          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ inputs.public-host || vars.SSH_HOST }} \
+          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ inputs.SSH_HOST || vars.SSH_HOST }} \
             "docker ps --filter name=postgres --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'"
       
   # Clean ips on the server side

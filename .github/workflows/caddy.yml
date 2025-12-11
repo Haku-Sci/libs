@@ -2,7 +2,7 @@ name: Deploy Caddy via SSH with templated Caddyfile
 on:
   workflow_call:
     inputs:
-      public-host:
+      SSH_HOST:
         description: 'Override for SSH_HOST variable'
         required: false
         type: string
@@ -127,17 +127,17 @@ jobs:
       - name: Add SSH host key
         run: |
           mkdir -p ~/.ssh
-          echo "Scanning SSH host key for ${{ inputs.public-host || vars.SSH_HOST }}:${{ vars.SSH_PORT }}"
-          ssh-keyscan -p ${{ vars.SSH_PORT }} ${{ inputs.public-host || vars.SSH_HOST }} 2>&1 | tee -a ~/.ssh/known_hosts
+          echo "Scanning SSH host key for ${{ inputs.SSH_HOST || vars.SSH_HOST }}:${{ vars.SSH_PORT }}"
+          ssh-keyscan -p ${{ vars.SSH_PORT }} ${{ inputs.SSH_HOST || vars.SSH_HOST }} 2>&1 | tee -a ~/.ssh/known_hosts
           echo "SSH host key added successfully"
       
       - name: Copy templated Caddyfile to remote
         run: |
-          scp -P ${{ vars.SSH_PORT }} Caddyfile ${{ vars.SSH_USER }}@${{ inputs.public-host || vars.SSH_HOST }}:/tmp/Caddyfile
+          scp -P ${{ vars.SSH_PORT }} Caddyfile ${{ vars.SSH_USER }}@${{ inputs.SSH_HOST || vars.SSH_HOST }}:/tmp/Caddyfile
       
       - name: Deploy Caddy container via SSH
         run: |
-          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ inputs.public-host || vars.SSH_HOST }} bash << 'EOF'
+          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ inputs.SSH_HOST || vars.SSH_HOST }} bash << 'EOF'
             if docker ps -a --format '{{.Names}}' | grep -qw "caddy"; then
               docker rm -f caddy
             fi

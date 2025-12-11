@@ -8,7 +8,7 @@ on:
         required: false
         type: boolean
         default: false
-      public-host:
+      SSH_HOST:
         description: 'Override for SSH_HOST variable'
         required: false
         type: string
@@ -116,13 +116,13 @@ jobs:
             value_escaped=$(printf '%s' "$value" | sed 's/"/\\"/g' | tr '\r\n' ' ' | sed 's/  */ /g')
             ENV_RUN+=" -e $key=\"$value_escaped\""
           done
-          ENV_RUN+=" -e SERVICE_PUBLIC_HOSTNAME=${{ inputs.public-host || vars.SSH_HOST }}"
+          ENV_RUN+=" -e SERVICE_PUBLIC_HOSTNAME=${{ inputs.SSH_HOST || vars.SSH_HOST }}"
           echo "env_run=$ENV_RUN" >> "$GITHUB_OUTPUT"
 
       - name: Deploy app via SSH
         run: |
           ssh -o StrictHostKeyChecking=no -p ${{ vars.SSH_PORT }} \
-              ${{ vars.SSH_USER }}@${{ inputs.public-host || vars.SSH_HOST }} bash << 'EOF'
+              ${{ vars.SSH_USER }}@${{ inputs.SSH_HOST || vars.SSH_HOST }} bash << 'EOF'
             docker rm -f app || true
             NETWORK_ARG=""
             if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
@@ -139,5 +139,5 @@ jobs:
       - name: Clean up unused Docker images
         run: |
           ssh -o StrictHostKeyChecking=no -p ${{ vars.SSH_PORT }} \
-              ${{ vars.SSH_USER }}@${{ inputs.public-host || vars.SSH_HOST }} \
+              ${{ vars.SSH_USER }}@${{ inputs.SSH_HOST || vars.SSH_HOST }} \
               "docker image prune -af"

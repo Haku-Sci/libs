@@ -3,7 +3,7 @@ name: Build and Publish Neo4j Plugin
 on:
   workflow_call:
     inputs:
-      public-host:
+      SSH_HOST:
         description: 'Override for SSH_HOST variable'
         required: false
         type: string
@@ -106,7 +106,7 @@ jobs:
             "workflow_run_url": "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}",
             "repository": "${GITHUB_REPOSITORY}",
             "deployment": {
-              "target_host": "${{ inputs.public-host || vars.SSH_HOST }}",
+              "target_host": "${{ inputs.SSH_HOST || vars.SSH_HOST }}",
               "ssh_port": "${{ vars.SSH_PORT || '22' }}",
               "requires_restart": true
             }
