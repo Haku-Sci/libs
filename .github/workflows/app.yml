@@ -34,20 +34,19 @@ jobs:
             --allow-insecure-entitlement network.host
           driver-opts: |
             network=host
-      
+
       - name: Set dynamic build-args for NEXT_PUBLIC_ vars
         id: buildargs
         env:
           ALL_VARS: ${{ toJSON(vars) }}
         run: |
-          args=$(echo "$ALL_VARS" | jq -r 'to_entries 
-            | map(select(.key | startswith("NEXT_PUBLIC_"))) 
-            | map("\(.key)=\(.value)") 
+          args=$(echo "$ALL_VARS" | jq -r 'to_entries
+            | map(select(.key | startswith("NEXT_PUBLIC_")))
+            | map("\(.key)=\(.value)")
             | join("\n")')
           echo "build_args<<EOF" >> $GITHUB_OUTPUT
           echo "$args" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-
 
       # With cache (default)
       - name: Build Docker image (with cache)
@@ -81,8 +80,6 @@ jobs:
           network: host
           build-args: ${{ steps.buildargs.outputs.build_args }}
 
-
-
       - name: Start ssh-agent
         uses: webfactory/ssh-agent@v0.4.1
         with:
@@ -92,33 +89,14 @@ jobs:
         run: |
           docker save ${{ github.repository }}:latest | ssh -o StrictHostKeyChecking=no -p ${{ vars.SSH_PORT }} ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} docker load
 
-      - name: Debug environment resolution
-        run: |
-          echo "github.ref_name = ${{ github.ref_name }}"
-          echo "Environment resolved = ${{ job.environment }}"
-          echo "SSH_HOST = ${{ vars.SSH_HOST }}"
-          echo "SSH_PORT = ${{ vars.SSH_PORT }}"
-          echo "SSH_USER = ${{ vars.SSH_USER }}"
-          echo "All vars keys = $(echo '${{ toJson(vars) }}' | jq -r 'keys[]')"
-
-      - name: Set environment and service configuration
+      - name: Set service configuration
         id: set_config
         run: |
-          # Detect service name from repo or input
           SERVICE_NAME="${{ inputs.service_name }}"
           if [ -z "$SERVICE_NAME" ]; then
             SERVICE_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
           fi
           echo "service_name=$SERVICE_NAME" >> "$GITHUB_OUTPUT"
-
-          # Detect environment from branch
-          BRANCH="${{ github.ref_name }}"
-          IS_STAGING="false"
-          if [ "$BRANCH" = "staging" ]; then
-            IS_STAGING="true"
-          fi
-          echo "is_staging=$IS_STAGING" >> "$GITHUB_OUTPUT"
-          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
 
       - name: Set port redirection if needed
         id: set_redirectports
@@ -156,70 +134,42 @@ jobs:
           ssh -o StrictHostKeyChecking=no -p ${{ vars.SSH_PORT }} \
               ${{ vars.SSH_USER }}@${{ inputs.SSH_HOST || vars.SSH_HOST }} bash << 'EOF'
             SERVICE_NAME="${{ steps.set_config.outputs.service_name }}"
-            IS_STAGING="${{ steps.set_config.outputs.is_staging }}"
-
-            # Container name based on environment
-            if [ "$IS_STAGING" = "true" ]; then
-              CONTAINER_NAME="app_${SERVICE_NAME}"
-            else
-              CONTAINER_NAME="app"
-            fi
+            CONTAINER_NAME="app_${SERVICE_NAME}"
 
             # Remove existing container
             docker rm -f $CONTAINER_NAME || true
 
-            # Network configuration
-            NETWORK_ARG=""
-
-            if [ "$IS_STAGING" = "true" ]; then
-              # Staging: Create global network for inter-service communication
-              # If CONSUL_URL is defined, use its IP to derive the subnet
-              if [ -n "${{ vars.CONSUL_URL }}" ]; then
-                CONSUL_IP=$(echo "${{ vars.CONSUL_URL }}" | sed 's|https\?://||' | cut -d':' -f1)
-                SUBNET=$(echo "$CONSUL_IP" | awk -F. '{print $1"."$2"."$3".0/24"}')
-                docker network create --subnet "$SUBNET" staging_services 2>/dev/null || true
-              else
-                docker network create staging_services 2>/dev/null || true
-              fi
-
-              # Assign fixed IP if this service is Consul
-              IP_ARG=""
-              if [ "$SERVICE_NAME" = "consul" ] && [ -n "$CONSUL_IP" ]; then
-                IP_ARG="--ip $CONSUL_IP"
-              fi
-
-              # Create service-specific network (for app + db of same service)
-              if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
-                SERVICE_NETWORK="network_${SERVICE_NAME}"
-                docker network create "$SERVICE_NETWORK" || true
-                NETWORK_ARG="--network $SERVICE_NETWORK"
-              fi
+            # Create global network for inter-service communication
+            if [ -n "${{ vars.CONSUL_URL }}" ]; then
+              CONSUL_IP=$(echo "${{ vars.CONSUL_URL }}" | sed 's|.*://||' | cut -d':' -f1)
+              SUBNET=$(echo "$CONSUL_IP" | awk -F. '{print $1"."$2"."$3".0/24"}')
+              docker network create --subnet "$SUBNET" services 2>/dev/null || true
             else
-              # Production: Use service-specific network only (each service on its own server)
-              if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
-                docker network create "${{ vars.DOCKER_NETWORK }}" || true
-                NETWORK_ARG="--network ${{ vars.DOCKER_NETWORK }}"
-              fi
+              docker network create services 2>/dev/null || true
             fi
 
-            # Run container on staging_services (with fixed IP if needed), or on service network in production
-            if [ "$IS_STAGING" = "true" ]; then
-              docker run -d --name $CONTAINER_NAME \
-                --network staging_services $IP_ARG \
-                ${{ steps.set_redirectports.outputs.redirected_ports }} \
-                ${{ steps.set_env_vars.outputs.env_run }} \
-                ${{ github.repository }}:latest
+            # Assign fixed IP if this service is Consul
+            IP_ARG=""
+            if [ "$SERVICE_NAME" = "consul" ] && [ -n "$CONSUL_IP" ]; then
+              IP_ARG="--ip $CONSUL_IP"
+            fi
 
-              # Connect to service-specific network as well (for app + db communication)
-              if [ -n "$SERVICE_NETWORK" ]; then
-                docker network connect "$SERVICE_NETWORK" $CONTAINER_NAME
-              fi
-            else
-              docker run -d --name $CONTAINER_NAME \
-                $NETWORK_ARG \
-                ${{ steps.set_redirectports.outputs.redirected_ports }} \
-                ${{ steps.set_env_vars.outputs.env_run }} \
-                ${{ github.repository }}:latest
+            # Create service-specific network (for app + db of same service)
+            if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
+              SERVICE_NETWORK="network_${SERVICE_NAME}"
+              docker network create "$SERVICE_NETWORK" 2>/dev/null || true
+            fi
+
+            # Run container
+            docker run -d --name $CONTAINER_NAME \
+              --network services $IP_ARG \
+              ${{ steps.set_redirectports.outputs.redirected_ports }} \
+              ${{ steps.set_env_vars.outputs.env_run }} \
+              ${{ github.repository }}:latest
+
+            # Connect to service-specific network as well (for app + db communication)
+            if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
+              docker network connect "$SERVICE_NETWORK" $CONTAINER_NAME
             fi
           EOF
 
