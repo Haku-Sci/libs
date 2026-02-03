@@ -23,7 +23,6 @@
                 "HOST":"haku-test.com",
                 "API_URL":"https://api.haku-test.com",
                 "DOI_ENDPOINT":"https://doi.org/",
-                "COLLAB_URL":"wss://collab.haku-test.com:4000"
             },
         },
         //Api
