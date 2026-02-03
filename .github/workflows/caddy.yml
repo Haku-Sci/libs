@@ -31,15 +31,15 @@ jobs:
           # Auto-generated Caddyfile for branch: $BRANCH
 
           ${BRANCH}.${DOMAIN} {
-              reverse_proxy app_front:8080
+              reverse_proxy app_front:3000
           }
 
           ${BRANCH}-api.${DOMAIN} {
-              reverse_proxy app_api:8080
+              reverse_proxy app_api:3000
           }
 
           ${BRANCH}-collab.${DOMAIN} {
-              reverse_proxy app_collab:8080
+              reverse_proxy app_collab:3000
           }
           BLOCK
 
