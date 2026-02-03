@@ -92,6 +92,15 @@ jobs:
         run: |
           docker save ${{ github.repository }}:latest | ssh -o StrictHostKeyChecking=no -p ${{ vars.SSH_PORT }} ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} docker load
 
+      - name: Debug environment resolution
+        run: |
+          echo "github.ref_name = ${{ github.ref_name }}"
+          echo "Environment resolved = ${{ job.environment }}"
+          echo "SSH_HOST = ${{ vars.SSH_HOST }}"
+          echo "SSH_PORT = ${{ vars.SSH_PORT }}"
+          echo "SSH_USER = ${{ vars.SSH_USER }}"
+          echo "All vars keys = $(echo '${{ toJson(vars) }}' | jq -r 'keys[]')"
+
       - name: Set environment and service configuration
         id: set_config
         run: |
