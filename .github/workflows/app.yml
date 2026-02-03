@@ -12,12 +12,16 @@ on:
         description: 'Override for SSH_HOST variable'
         required: false
         type: string
+      service_name:
+        description: 'Service name for container naming (auto-detected from repo if not provided)'
+        required: false
+        type: string
 
 jobs:
   deploy:
     name: Build and Deploy
     runs-on: ubuntu-latest
-    environment: development
+    environment: ${{ github.ref_name }}
 
     steps:
       - name: Checkout repository
@@ -88,6 +92,25 @@ jobs:
         run: |
           docker save ${{ github.repository }}:latest | ssh -o StrictHostKeyChecking=no -p ${{ vars.SSH_PORT }} ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} docker load
 
+      - name: Set environment and service configuration
+        id: set_config
+        run: |
+          # Detect service name from repo or input
+          SERVICE_NAME="${{ inputs.service_name }}"
+          if [ -z "$SERVICE_NAME" ]; then
+            SERVICE_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          fi
+          echo "service_name=$SERVICE_NAME" >> "$GITHUB_OUTPUT"
+
+          # Detect environment from branch
+          BRANCH="${{ github.ref_name }}"
+          IS_STAGING="false"
+          if [ "$BRANCH" = "staging" ]; then
+            IS_STAGING="true"
+          fi
+          echo "is_staging=$IS_STAGING" >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
       - name: Set port redirection if needed
         id: set_redirectports
         run: |
@@ -123,17 +146,72 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -p ${{ vars.SSH_PORT }} \
               ${{ vars.SSH_USER }}@${{ inputs.SSH_HOST || vars.SSH_HOST }} bash << 'EOF'
-            docker rm -f app || true
-            NETWORK_ARG=""
-            if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
-              docker network create "${{ vars.DOCKER_NETWORK }}" || true
-              NETWORK_ARG="--network ${{ vars.DOCKER_NETWORK }}"
+            SERVICE_NAME="${{ steps.set_config.outputs.service_name }}"
+            IS_STAGING="${{ steps.set_config.outputs.is_staging }}"
+
+            # Container name based on environment
+            if [ "$IS_STAGING" = "true" ]; then
+              CONTAINER_NAME="app_${SERVICE_NAME}"
+            else
+              CONTAINER_NAME="app"
             fi
-            docker run -d --name app \
-              $NETWORK_ARG \
-              ${{ steps.set_redirectports.outputs.redirected_ports }} \
-              ${{ steps.set_env_vars.outputs.env_run }} \
-              ${{ github.repository }}:latest
+
+            # Remove existing container
+            docker rm -f $CONTAINER_NAME || true
+
+            # Network configuration
+            NETWORK_ARG=""
+
+            if [ "$IS_STAGING" = "true" ]; then
+              # Staging: Create global network for inter-service communication
+              # If CONSUL_URL is defined, use its IP to derive the subnet
+              if [ -n "${{ vars.CONSUL_URL }}" ]; then
+                CONSUL_IP=$(echo "${{ vars.CONSUL_URL }}" | sed 's|https\?://||' | cut -d':' -f1)
+                SUBNET=$(echo "$CONSUL_IP" | awk -F. '{print $1"."$2"."$3".0/24"}')
+                docker network create --subnet "$SUBNET" staging_services 2>/dev/null || true
+              else
+                docker network create staging_services 2>/dev/null || true
+              fi
+
+              # Assign fixed IP if this service is Consul
+              IP_ARG=""
+              if [ "$SERVICE_NAME" = "consul" ] && [ -n "$CONSUL_IP" ]; then
+                IP_ARG="--ip $CONSUL_IP"
+              fi
+
+              # Create service-specific network (for app + db of same service)
+              if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
+                SERVICE_NETWORK="network_${SERVICE_NAME}"
+                docker network create "$SERVICE_NETWORK" || true
+                NETWORK_ARG="--network $SERVICE_NETWORK"
+              fi
+            else
+              # Production: Use service-specific network only (each service on its own server)
+              if [ -n "${{ vars.DOCKER_NETWORK }}" ]; then
+                docker network create "${{ vars.DOCKER_NETWORK }}" || true
+                NETWORK_ARG="--network ${{ vars.DOCKER_NETWORK }}"
+              fi
+            fi
+
+            # Run container on staging_services (with fixed IP if needed), or on service network in production
+            if [ "$IS_STAGING" = "true" ]; then
+              docker run -d --name $CONTAINER_NAME \
+                --network staging_services $IP_ARG \
+                ${{ steps.set_redirectports.outputs.redirected_ports }} \
+                ${{ steps.set_env_vars.outputs.env_run }} \
+                ${{ github.repository }}:latest
+
+              # Connect to service-specific network as well (for app + db communication)
+              if [ -n "$SERVICE_NETWORK" ]; then
+                docker network connect "$SERVICE_NETWORK" $CONTAINER_NAME
+              fi
+            else
+              docker run -d --name $CONTAINER_NAME \
+                $NETWORK_ARG \
+                ${{ steps.set_redirectports.outputs.redirected_ports }} \
+                ${{ steps.set_env_vars.outputs.env_run }} \
+                ${{ github.repository }}:latest
+            fi
           EOF
 
       - name: Clean up unused Docker images
