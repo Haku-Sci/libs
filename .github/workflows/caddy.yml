@@ -34,11 +34,11 @@ jobs:
               reverse_proxy app_front:8080
           }
 
-          api.${BRANCH}.${DOMAIN} {
+          ${BRANCH}-api.${DOMAIN} {
               reverse_proxy app_api:8080
           }
 
-          collab.${BRANCH}.${DOMAIN} {
+          ${BRANCH}-collab.${DOMAIN} {
               reverse_proxy app_collab:8080
           }
           BLOCK
