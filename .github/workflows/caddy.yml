@@ -84,6 +84,7 @@ jobs:
               -e TS_STATE_DIR=/var/lib/tailscale \
               -e TS_USERSPACE=false \
               -e TS_HOSTNAME=caddy \
+              -e TS_EXTRA_ARGS="--advertise-tags=tag:ci" \
               -v /var/lib/ts-caddy:/var/lib/tailscale \
               --device /dev/net/tun:/dev/net/tun \
               tailscale/tailscale:latest
