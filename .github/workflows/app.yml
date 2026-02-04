@@ -103,7 +103,7 @@ jobs:
         run: |
           REDIRECT_PORT=""
           if [ -n "${{ vars.DOCKER_PORT_REDIRECT }}" ]; then
-            REDIRECT_PORT="-p ${{ vars.DOCKER_PORT_REDIRECT }}"
+            REDIRECT_PORT=$(echo "${{ vars.DOCKER_PORT_REDIRECT }}" | tr ',' '\n' | sed 's/^/-p /' | tr '\n' ' ')
           fi
           echo "redirected_ports=$REDIRECT_PORT" >> "$GITHUB_OUTPUT"
 
