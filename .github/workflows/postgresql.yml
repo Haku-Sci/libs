@@ -96,7 +96,7 @@ jobs:
             echo "PostgreSQL container started"
 
             # Set the password for the admin user
-            docker exec $CONTAINER_NAME psql -U "${{ env.POSTGRES_ADMIN }}" -d "${{ env.DB_NAME }}" -c "ALTER USER \"${{ env.POSTGRES_ADMIN }}\" WITH PASSWORD '${{ env.POSTGRES_PASSWORD }}';"
+            docker exec $CONTAINER_NAME psql -h localhost -U "${{ env.POSTGRES_ADMIN }}" -d "${{ env.DB_NAME }}" -c "ALTER USER \"${{ env.POSTGRES_ADMIN }}\" WITH PASSWORD '${{ env.POSTGRES_PASSWORD }}';"
           EOF
 
       - name: Show PostgreSQL status on server
