@@ -37,7 +37,7 @@ jobs:
 
       - name: Deploy PostgreSQL container via SSH
         run: |
-          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no ${{ vars.SSH_USER }}@${{ inputs.SSH_HOST || vars.SSH_HOST }} bash << 'EOF'
+          ssh -p ${{ vars.SSH_PORT }} -o StrictHostKeyChecking=no -o ServerAliveInterval=10 -o ServerAliveCountMax=3 ${{ vars.SSH_USER }}@${{ inputs.SSH_HOST || vars.SSH_HOST }} bash << 'EOF'
             SERVICE_NAME="${{ steps.set_config.outputs.service_name }}"
             CONTAINER_NAME="postgresql_${SERVICE_NAME}"
 
@@ -66,18 +66,37 @@ jobs:
             if [ $RC -ne 0 ]; then
               docker logs $CONTAINER_NAME || true
               exit $RC
-            else
-              echo "PostgreSQL container starting with name '$CONTAINER_NAME'."
-              # Wait for PostgreSQL to be ready
-              until docker logs $CONTAINER_NAME 2>&1 | { grep -E -qi 'ready' && exit 0; grep -E -qi 'error' && exit 1; false; }; do sleep 1; done
+            fi
 
-              echo "PostgreSQL container started"
+            echo "PostgreSQL container starting with name '$CONTAINER_NAME'."
 
-              # Set the password for the admin user
-              docker exec -i $CONTAINER_NAME psql -U "${{ env.POSTGRES_ADMIN }}" -d "${{ env.DB_NAME }}" << 'SQL'
-                ALTER USER "${{ env.POSTGRES_ADMIN }}" WITH PASSWORD '${{ env.POSTGRES_PASSWORD }}';
-          SQL
-          fi
+            # Wait for PostgreSQL to be ready (max 60 seconds)
+            TIMEOUT=60
+            READY=false
+            for i in $(seq 1 $TIMEOUT); do
+              LOGS=$(docker logs $CONTAINER_NAME 2>&1)
+              if echo "$LOGS" | grep -qi 'ready to accept connections'; then
+                READY=true
+                break
+              fi
+              if ! docker ps --format '{{.Names}}' | grep -qw "$CONTAINER_NAME"; then
+                echo "ERROR: Container $CONTAINER_NAME stopped unexpectedly"
+                docker logs $CONTAINER_NAME 2>&1
+                exit 1
+              fi
+              sleep 1
+            done
+
+            if [ "$READY" != "true" ]; then
+              echo "ERROR: PostgreSQL did not become ready within ${TIMEOUT}s"
+              docker logs $CONTAINER_NAME 2>&1
+              exit 1
+            fi
+
+            echo "PostgreSQL container started"
+
+            # Set the password for the admin user
+            docker exec $CONTAINER_NAME psql -U "${{ env.POSTGRES_ADMIN }}" -d "${{ env.DB_NAME }}" -c "ALTER USER \"${{ env.POSTGRES_ADMIN }}\" WITH PASSWORD '${{ env.POSTGRES_PASSWORD }}';"
           EOF
 
       - name: Show PostgreSQL status on server
