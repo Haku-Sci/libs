@@ -5,8 +5,7 @@
       "Bash(bash -x .git/hooks/prepare-commit-msg /tmp/test-commit-msg.txt)",
       "Bash(bash .git/hooks/prepare-commit-msg /tmp/test-commit-msg2.txt)",
       "Bash(cat:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)"
-   ]
+      "Bash(ssh integration:*)"
+    ]
   }
 }
