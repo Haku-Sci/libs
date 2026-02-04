@@ -32,14 +32,17 @@ jobs:
 
           ${BRANCH}.${DOMAIN} {
               reverse_proxy app_front:3000
+              tls internal
           }
 
           ${BRANCH}-api.${DOMAIN} {
               reverse_proxy app_api:3000
+              tls internal
           }
 
           ${BRANCH}-collab.${DOMAIN} {
               reverse_proxy app_collab:3000
+              tls internal
           }
           
           BLOCK
@@ -52,22 +55,56 @@ jobs:
           HOST="${{ inputs.SSH_HOST || vars.SSH_HOST }}"
           PORT="${{ vars.SSH_PORT }}"
           USER="${{ vars.SSH_USER }}"
+          TS_AUTHKEY="${{ secrets.TS_OAUTH_SECRET }}"
 
           scp -P $PORT /tmp/Caddyfile ${USER}@${HOST}:/tmp/Caddyfile
 
-          ssh -p $PORT -o StrictHostKeyChecking=no ${USER}@${HOST} bash << 'EOF'
+          ssh -p $PORT -o StrictHostKeyChecking=no ${USER}@${HOST} bash -s "$TS_AUTHKEY" << 'EOF'
+            TS_AUTHKEY="$1"
+
             if docker ps -a --format '{{.Names}}' | grep -qw "caddy"; then
               docker rm -f caddy
             fi
-            mkdir -p /opt/caddy/config /opt/caddy/data
+            if docker ps -a --format '{{.Names}}' | grep -qw "ts-caddy"; then
+              docker rm -f ts-caddy
+            fi
+
+            mkdir -p /opt/caddy/config /opt/caddy/data /var/lib/ts-caddy
             mv /tmp/Caddyfile /opt/caddy/config/Caddyfile
 
             docker network create services 2>/dev/null || true
 
+            # Tailscale sidecar: authenticates via OAuth, creates VPN interface
+            docker run -d \
+              --name ts-caddy \
+              --hostname caddy \
+              --cap-add NET_ADMIN \
+              --cap-add SYS_MODULE \
+              -e TS_AUTHKEY="$TS_AUTHKEY" \
+              -e TS_STATE_DIR=/var/lib/tailscale \
+              -e TS_HOSTNAME=caddy \
+              -v /var/lib/ts-caddy:/var/lib/tailscale \
+              -v /dev/net/tun:/dev/net/tun \
+              tailscale/tailscale:latest
+
+            # Connect Tailscale container to services network so Caddy can reach backends
+            docker network connect services ts-caddy
+
+            # Wait for Tailscale to be ready
+            echo "Waiting for Tailscale to connect..."
+            for i in $(seq 1 30); do
+              if docker exec ts-caddy tailscale status >/dev/null 2>&1; then
+                echo "Tailscale is connected!"
+                docker exec ts-caddy tailscale ip -4
+                break
+              fi
+              sleep 2
+            done
+
+            # Caddy shares Tailscale's network namespace: only reachable via Tailscale IP
             docker run -d \
               --name caddy \
-              --network services \
-              -p 80:80 -p 443:443 \
+              --network container:ts-caddy \
               -v /opt/caddy/config/Caddyfile:/etc/caddy/Caddyfile:ro \
               -v /opt/caddy/data:/data \
               caddy:2-alpine
