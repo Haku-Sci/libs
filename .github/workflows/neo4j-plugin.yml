@@ -52,6 +52,13 @@ jobs:
           fi
           echo "service_name=$SERVICE_NAME" >> "$GITHUB_OUTPUT"
 
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ vars.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
       - name: Start ssh-agent
         uses: webfactory/ssh-agent@v0.4.1
         with:

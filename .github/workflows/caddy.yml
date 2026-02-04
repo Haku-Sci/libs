@@ -12,6 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.ref_name }}
     steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ vars.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
       - name: Start ssh-agent
         uses: webfactory/ssh-agent@v0.4.1
         with:
@@ -115,4 +122,28 @@ jobs:
               -v /opt/caddy/config/Caddyfile:/etc/caddy/Caddyfile:ro \
               -v /opt/caddy/data:/data \
               caddy:2-alpine
+
+            # TCP forwarder: expose database ports via Tailscale
+            docker rm -f tcp-forwarder 2>/dev/null || true
+
+            PG=$(docker ps --filter "name=postgresql_" --format '{{.Names}}' | head -1)
+            NEO=$(docker ps --filter "name=neo4j_" --format '{{.Names}}' | head -1)
+
+            FWD_CMD=""
+            if [ -n "$PG" ]; then
+              echo "Forwarding port 5432 -> ${PG}"
+              FWD_CMD="socat TCP-LISTEN:5432,fork,reuseaddr TCP:${PG}:5432 & "
+            fi
+            if [ -n "$NEO" ]; then
+              echo "Forwarding ports 7474,7687 -> ${NEO}"
+              FWD_CMD="${FWD_CMD}socat TCP-LISTEN:7474,fork,reuseaddr TCP:${NEO}:7474 & socat TCP-LISTEN:7687,fork,reuseaddr TCP:${NEO}:7687 & "
+            fi
+
+            if [ -n "$FWD_CMD" ]; then
+              docker run -d \
+                --name tcp-forwarder \
+                --network container:ts-caddy \
+                --restart unless-stopped \
+                alpine sh -c "apk add --no-cache socat && ${FWD_CMD}wait"
+            fi
           EOF
