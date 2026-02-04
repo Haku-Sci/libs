@@ -57,11 +57,11 @@ jobs:
             docker run -d \
               --name $CONTAINER_NAME \
               --network $SERVICE_NETWORK \
-              -v /opt/postgres/${SERVICE_NAME}/data:/var/lib/postgresql/data \
+              -v /opt/postgres/${SERVICE_NAME}/data:/var/lib/postgresql \
               -e POSTGRES_USER="${{ env.POSTGRES_ADMIN }}" \
               -e POSTGRES_PASSWORD="${{ env.POSTGRES_PASSWORD }}" \
               -e POSTGRES_DB="${{ env.DB_NAME }}" \
-              postgres:latest
+              postgres:18
             RC=$?
             if [ $RC -ne 0 ]; then
               docker logs $CONTAINER_NAME || true
