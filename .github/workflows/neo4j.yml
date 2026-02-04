@@ -91,7 +91,7 @@ jobs:
                 --name $CONTAINER_NAME \
                 --network $SERVICE_NETWORK \
                 -v /opt/neo4j/${SERVICE_NAME}/data:/data \
-                -e NEO4J_AUTH=neo4j/${{ env.NEO4J_PASSWORD }} \
+                -e "NEO4J_AUTH=neo4j/${{ env.NEO4J_PASSWORD }}" \
                 neo4j:latest
             fi
           EOF
