@@ -82,9 +82,10 @@ jobs:
               --cap-add SYS_MODULE \
               -e TS_AUTHKEY="$TS_AUTHKEY" \
               -e TS_STATE_DIR=/var/lib/tailscale \
+              -e TS_USERSPACE=false \
               -e TS_HOSTNAME=caddy \
               -v /var/lib/ts-caddy:/var/lib/tailscale \
-              -v /dev/net/tun:/dev/net/tun \
+              --device /dev/net/tun:/dev/net/tun \
               tailscale/tailscale:latest
 
             # Connect Tailscale container to services network so Caddy can reach backends
@@ -93,6 +94,11 @@ jobs:
             # Wait for Tailscale to be ready
             echo "Waiting for Tailscale to connect..."
             for i in $(seq 1 30); do
+              if ! docker inspect -f '{{.State.Running}}' ts-caddy 2>/dev/null | grep -q true; then
+                echo "ERROR: ts-caddy container is not running!"
+                docker logs ts-caddy
+                exit 1
+              fi
               if docker exec ts-caddy tailscale status >/dev/null 2>&1; then
                 echo "Tailscale is connected!"
                 docker exec ts-caddy tailscale ip -4
