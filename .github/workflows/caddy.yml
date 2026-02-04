@@ -41,10 +41,7 @@ jobs:
           ${BRANCH}-collab.${DOMAIN} {
               reverse_proxy app_collab:3000
           }
-
-          ${BRANCH}-consul.${DOMAIN} {
-              reverse_proxy app_consul:8500
-          }
+          
           BLOCK
 
           echo "Generated Caddyfile:"
