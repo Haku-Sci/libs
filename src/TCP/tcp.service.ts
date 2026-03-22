@@ -36,8 +36,8 @@ export class TCPService {
                 response$ = response$.pipe(timeout({ first: watchdogTimeout }));
             response$ = response$.pipe(defaultIfEmpty(null));
             const result = await lastValueFrom(response$);
-            if (result?.error)
-                throwError(() => new Error(`[${service}] ${result.message}`));
+            if ((result as any)?.error)
+                throwError(() => new Error(`[${service}] ${(result as any).message}`));
             return result;
         }
         finally {

@@ -17,7 +17,7 @@ export class Microservice {
     this.logger = new Logger(await utils.microServiceName())
     await this.setServerAddress();
     // Initialize the database if needed
-    if (process.env[process.env.ENV_POSTGRESQL_DB] && process.env.DEBUG) {
+    if (process.env.SQL_DB && process.env.DEBUG) {
       const postGresService = require('./postgres.service');
       postGresService.createDatabaseIfNotExists()
     }
