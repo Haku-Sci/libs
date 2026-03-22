@@ -23,6 +23,7 @@
                 "HOST":"haku-test.com",
                 "API_URL":"https://api.haku-test.com",
                 "DOI_ENDPOINT":"https://doi.org/",
+                "FEEDBACK_EMAIL":"feedback@haku-sci.com"
             },
         },
         //Api
@@ -63,9 +64,8 @@
             "type": "node-terminal",
             "envFile":"${workspaceFolder}/../libs/.env",
             "env": {
-                "RDS_DBNAME": "vault",
-                "RDS_HOSTNAME": "localhost",
-                "ENV_POSTGRESQL_PASSWORD":"VAULT_PASSWORD",
+                "SQL_DB": "vault",
+                "SQL_HOST": "localhost",
                 "TEMP_USER_HOURS_DURATION":"48",
                 "NOTIFICATION_READ_RETENTION_DAYS":"1"
             }
@@ -91,9 +91,8 @@
             "type": "node-terminal",
             "envFile":"${workspaceFolder}/../libs/.env",
             "env":{
-                "RDS_DBNAME":"third-party",
-                "RDS_HOSTNAME": "localhost",
-                "ENV_POSTGRESQL_PASSWORD":"THIRD_PARTY_PASSWORD",
+                "SQL_DB": "third-party",
+                "SQL_HOST": "localhost",
                 "SMTP_PORT":"587",
                 "FROM_USERNAME":"Haku-Sci",
                 "UNPAYWALL_URL":"https://api.unpaywall.org/v2",
@@ -106,17 +105,7 @@
                 "ALLAS_OPENSTACK_ENDPOINT":"https://pouta.csc.fi:5001/v3",
                 "SIGNED_URL_DURATION": "1"
             }
-        },
-        //Smee (GitHub Webhook Proxy)
-        {
-            "name": "Smee - GitHub Webhooks",
-            "type": "node-terminal",
-            "request": "launch",
-            "command": "smee -u https://smee.io/wgc4FQgaHN1haMyp -t https://api.haku-test.com/github/issue",
-            "env": {
-                "NODE_TLS_REJECT_UNAUTHORIZED": "0"
-            }
-        },
+        },        
         //Compile Neo4j plugin
         {
             "name": "[plugin] compile neo4j plugin",
