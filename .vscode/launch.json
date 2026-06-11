@@ -2,7 +2,15 @@
     // Use IntelliSense to learn about possible attributes.
     // Hover to view descriptions of existing attributes.
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
+    "version": "0.2.0",    
+    "compounds": [
+        {
+            "name": "Start all services",
+            "configurations": ["Front", "Api", "Collab", "Vault", "Graph", "Third-party", "Data-processing"],
+            "preLaunchTask": "Start local tools and wait",
+            "stopAll": true
+        }
+    ],
     "configurations": [        
         //local tools        
         {
@@ -34,6 +42,7 @@
             "type": "node-terminal",
             "envFile":"${workspaceFolder}/../libs/.env",
             "env": {
+                "GATEWAY_HOST": "localhost",
                 "PORT":"443",
                 "ADDRESS":"api.haku-test.com",
                 "CORS_ORIGINS":"https://www.haku-test.com https://haku-test.com",
@@ -106,6 +115,17 @@
                 "SIGNED_URL_DURATION": "1"
             }
         },        
+        //Data-processing
+        {
+            "command": "python ${workspaceFolder}/../services/data-processing/app/main.py",
+            "name": "Data-processing",
+            "request": "launch",
+            "type": "node-terminal",
+            "envFile":"${workspaceFolder}/../libs/.env",
+            "env": {
+                "CONSUL_URL":"http://hubs.haku-test.com:8500"
+            }
+        },
         //Compile Neo4j plugin
         {
             "name": "[plugin] compile neo4j plugin",
@@ -113,56 +133,7 @@
             "request": "launch",
             "command": "mvn clean package; python ${workspaceFolder}/../libs/local-tools/containers/start-container.py neo4j",
             "cwd": "${workspaceFolder}/../services/graph/plugins"
-        },
-        //Not yet used serices
-        //Cron
-        {
-            "name": "Cron",
-            "type": "go",
-            "request": "launch",
-            "mode": "auto",
-            "program": "../services/cron/main.go",
-            "envFile":"${workspaceFolder}/../libs/.env", 
-            "console": "integratedTerminal",
-            "showLog": true 
-        },
-        //Data-processing
-        {
-            "name": "Data-processing",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/data-processing/app/main.py",
-            "console": "integratedTerminal",
-            "envFile":"${workspaceFolder}/../libs/.env"
-        },
-        {
-            "name": "[Local Tools] start tunnels",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/../libs/local-tools/start-distant-dbs.py",
-            "console": "integratedTerminal",
-            "justMyCode": true
-        },
-        {
-            "name": "[Local Tools] set consul services",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/../libs/local-tools/set-consul-services.py",
-            "justMyCode": true
-        },
-        {
-            "name": "[Local Tools] clean consul services",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/../libs/local-tools/cleanup-consul-services.py",
-            "justMyCode": true
-        },
-        {
-            "name": "Run service controller",
-            "request": "launch",
-            "type": "chrome",
-            "file": "${workspaceFolder}/../libs/local-tools/services-controller/index.html"
-        }
+        },        
     ],
     "inputs": [        
         {
