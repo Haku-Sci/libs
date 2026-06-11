@@ -1,4 +1,5 @@
 import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
+import { TCP_PARAM_METADATA_KEY } from './tcp-param.decorator';
 import { catchError, lastValueFrom, throwError, timeout, defaultIfEmpty } from 'rxjs';
 import * as utils from '../utils'
 import { Consul } from '../microservice/consul';
@@ -43,7 +44,7 @@ export class TCPService {
         finally {
             try {
                 await client.close();
-            } catch (closeError) {
+            } catch (closeError:any) {
                 console.error("Error closing client:", closeError.message);
             }
         }
@@ -62,13 +63,48 @@ export class TCPService {
                 if (propertyName === 'constructor' || typeof method !== 'function') continue;
                 const action = Reflect.getMetadata(PATTERN_METADATA, method)?.[0];
                 if (action) {
-
                     const handler = TCPService.wrapHandler(instance, propertyName, logger);
                     app.serverInstance.addHandler([resource, action].join("/"), handler, false);
                 }
             }
         }
+        TCPService.enablePatternRouting(app.serverInstance);
         logger.log("HakuSci Message Handlers initialized")
+    }
+
+    private static enablePatternRouting(server: any) {
+        const handlers: Map<string, any> = (server as any).messageHandlers;
+        const paramPatterns: Array<{ regex: RegExp; paramNames: string[]; registeredKey: string }> = [];
+
+        for (const key of handlers.keys()) {
+            if (!key.includes(':')) continue;
+            const paramNames: string[] = [];
+            const regexStr = key.replace(/:([^/]+)/g, (_, name) => {
+                paramNames.push(name);
+                return '([^/]+)';
+            });
+            paramPatterns.push({ regex: new RegExp(`^${regexStr}$`), paramNames, registeredKey: key });
+        }
+
+        if (paramPatterns.length === 0) return;
+
+        const originalGetHandler = server.getHandlerByPattern.bind(server);
+        server.getHandlerByPattern = (incomingPattern: string) => {
+            const exact = originalGetHandler(incomingPattern);
+            if (exact) return exact;
+
+            for (const { regex, paramNames, registeredKey } of paramPatterns) {
+                const match = incomingPattern.match(regex);
+                if (!match) continue;
+                const originalHandler = originalGetHandler(registeredKey);
+                if (!originalHandler) continue;
+
+                const params: Record<string, string> = {};
+                paramNames.forEach((name, i) => { params[name] = match[i + 1]; });
+                return (data: any, ctx: any) => originalHandler({ ...data, params }, ctx);
+            }
+            return null;
+        };
     }
 
     private static wrapHandler(
@@ -76,10 +112,17 @@ export class TCPService {
         methodName: string,
         logger: Logger
     ): (...args: any[]) => any {
+        const prototype = Object.getPrototypeOf(instance);
+        const tcpParamMeta: Array<{ index: number; name: string }> =
+            Reflect.getMetadata(TCP_PARAM_METADATA_KEY, prototype, methodName) ?? [];
+
         return async function boundHandler(data: any, context: any) {
             try {
-                // Appel de la méthode d’origine
-                return await instance[methodName].call(instance, data);
+                const { params, ...payload } = data ?? {};
+                const args: any[] = [tcpParamMeta.length > 0 ? payload : data];
+                for (const { index, name } of tcpParamMeta)
+                    args[index] = params?.[name];
+                return await instance[methodName].apply(instance, args);
             } catch (err) {
                 // Reconstruction minimale d’un ArgumentsHost RPC
                 const host: ArgumentsHost = {

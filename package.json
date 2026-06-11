@@ -1,6 +1,6 @@
 {
   "name": "@haku-sci/utils",
-  "version": "2.6.0",
+  "version": "2.7.1",
   "description": "utils from haku-sci. Library only",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
@@ -47,5 +47,8 @@
     "microservices",
     "ports",
     "hosts"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }
