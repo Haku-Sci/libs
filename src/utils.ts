@@ -48,6 +48,10 @@ export async function microServiceName(): Promise<string> {
   return this.msName;
 }
 
+export function getHttpRequestMaxSize(requestMaxSize?: string): number {
+  return (parseInt(requestMaxSize ?? process.env.REQUEST_MAX_SIZE ?? '100', 10) - 10) * 1024;
+}
+
 export function withWatchdog<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
