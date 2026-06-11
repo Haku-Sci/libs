@@ -34,18 +34,15 @@ function getFunctionParameterNames(func: Function): string[] {
     .filter(param => param);
 }
 
+let _msName: string | undefined;
+
 export async function microServiceName(): Promise<string> {
-  if (!this.msName) {
-    var data = await readFile(
-      path.join(
-        process.cwd(),
-        'package.json',
-      )
-    )
+  if (!_msName) {
+    const data = await readFile(path.join(process.cwd(), 'package.json'));
     const { name } = JSON.parse(data.toString());
-    this.msName = name;
+    _msName = name;
   }
-  return this.msName;
+  return _msName!;
 }
 
 export function getHttpRequestMaxSize(requestMaxSize?: string): number {
