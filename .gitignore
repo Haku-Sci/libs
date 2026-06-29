@@ -4,3 +4,4 @@ tsconfig.tsbuildinfo
 .vscode/launch.json
 .env
 package-lock.json
+graphify-out/**
