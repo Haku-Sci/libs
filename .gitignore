@@ -5,3 +5,4 @@ tsconfig.tsbuildinfo
 .env
 package-lock.json
 graphify-out/**
+local-tools/containers/neo4j-data-backup/**
