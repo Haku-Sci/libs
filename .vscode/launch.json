@@ -6,7 +6,7 @@
     "compounds": [
         {
             "name": "Start all services",
-            "configurations": ["Front", "Api", "Collab", "Vault", "Graph", "Third-party", "Data-processing"],
+            "configurations": ["Front", "Api", "Collab", "Vault", "Graph", "Third-party", "Data-processing", "Notification"],
             "preLaunchTask": "Start local tools and wait",
             "stopAll": true
         }
@@ -29,6 +29,7 @@
             "env":{
                 "PORT":"443",
                 "HOST":"haku-test.com",
+                "DEBUG":"true",
                 "API_URL":"https://api.haku-test.com",
                 "DOI_ENDPOINT":"https://doi.org/",
                 "FEEDBACK_EMAIL":"feedback@haku-sci.com"
@@ -65,6 +66,18 @@
                 "DEBOUNCE": "5000"
             }                   
         },
+         //Notification
+        {
+            "command": "npm run start:dev --prefix ../services/notification",
+            "name": "Notification",
+            "request": "launch",
+            "type": "node-terminal",
+            "envFile":"${workspaceFolder}/../libs/.env",
+            "env": {
+                "PORT":"4001",
+                "ADDRESS":"notification.haku-test.com",
+            }
+        },
         //vault
         {
             "command": "npm run start:dev --prefix ../services/vault",
@@ -79,6 +92,7 @@
                 "NOTIFICATION_READ_RETENTION_DAYS":"1"
             }
         },
+       
         //Graph
         {
             "command": "npm run start:dev --prefix ../services/graph",
@@ -126,12 +140,24 @@
                 "CONSUL_URL":"http://hubs.haku-test.com:8500"
             }
         },
+        //Test
+        {
+            "command": "npm run start:dev --prefix ../services/test",
+            "name": "Test",
+            "request": "launch",
+            "type": "node-terminal",
+            "envFile":"${workspaceFolder}/../libs/.env",
+            "env": {
+                "SQL_DB": "test",
+                "SQL_HOST": "localhost"
+            }
+        },
         //Compile Neo4j plugin
         {
             "name": "[plugin] compile neo4j plugin",
             "type": "node-terminal",
             "request": "launch",
-            "command": "mvn clean package; python ${workspaceFolder}/../libs/local-tools/containers/start-container.py neo4j",
+            "command": "mvn clean package; python ${workspaceFolder}/../libs/local-tools/containers/start-container.py neo4j --restart",
             "cwd": "${workspaceFolder}/../services/graph/plugins"
         },        
     ],
