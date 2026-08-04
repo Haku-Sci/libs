@@ -1,9 +1,3 @@
-@echo off
-setlocal
-
-echo [gitlab-cleanup] Connecting to gateway...
-
-ssh gateway "bash -s" <<'REMOTE'
 set -e
 
 echo ""
@@ -34,13 +28,3 @@ docker buildx prune -f
 echo ""
 echo "=== Disk usage after cleanup ==="
 df -h /
-REMOTE
-
-if %ERRORLEVEL% NEQ 0 (
-    echo [gitlab-cleanup] ERROR: SSH command failed.
-    exit /b 1
-)
-
-echo.
-echo [gitlab-cleanup] Done.
-endlocal
