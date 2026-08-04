@@ -91,13 +91,17 @@ def create_and_run_container(service_config):
     
     print(f"Container '{container_name}' created and started successfully.")
 
-def start_docker_container(container_name):
+def start_docker_container(container_name, force_restart=False):
     """Manage a Docker service: create, start, or take no action if already running."""
     container_config = containers[container_name]
     if check_container_status(container_name):
         if is_container_running(container_name):
+            if not force_restart:
+                print(f"Container '{container_name}' is already running.")
+                return
+            print(f"Restarting {container_name}...")
             stop_container(container_name)
-    
+
         print(f"Starting {container_name}...")
         if "on_load" in container_config:
             subprocess.run(["docker", *container_config["on_load"]], check=True)
@@ -110,9 +114,10 @@ def start_docker_container(container_name):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("container", help="Name of the container to start")
+    parser.add_argument("--restart", action="store_true", help="Restart the container if already running")
     args = parser.parse_args()
 
     with open(CONFIG_FILE) as f:
         containers = json.load(f)
 
-    start_docker_container(args.container)
+    start_docker_container(args.container, force_restart=args.restart)
