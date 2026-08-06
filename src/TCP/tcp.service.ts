@@ -21,11 +21,16 @@ export class TCPService {
             payload["sender"] = await utils.microServiceName()
             let response$ = await client.send([resource, action].join("/"), payload).pipe(
                 catchError(err => {
-                    err = err.error || err;
-                    const status = err?.status || HttpStatus.BAD_REQUEST;
+                    const inner = err?.error ?? err;
+                    const status = inner?.status || inner?.statusCode || err?.status || HttpStatus.BAD_REQUEST;
+                    const message =
+                        (typeof inner === 'object' ? inner?.message : inner) ||
+                        err?.message ||
+                        'Unknown error';
                     const payload = {
-                        ...(typeof err === 'object' ? err : { message: err }),
-                        service, 
+                        ...(typeof inner === 'object' ? inner : {}),
+                        message,
+                        service,
                     };
                     return throwError(
                         () => new HttpException(payload, status)
