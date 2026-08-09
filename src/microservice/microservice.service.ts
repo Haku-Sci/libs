@@ -5,7 +5,6 @@ import * as net from 'net';
 import * as utils from '../utils'
 
 import { AllExceptionsFilter } from './exceptionFilter';
-import * as os from 'os';
 import { Consul } from './consul';
 import { TCPService } from '../TCP/tcp.service';
 
@@ -32,33 +31,10 @@ export class Microservice {
     Consul.registerService(this.serverAddress, this.logger)
   }
 
-  private static isPortFree(port: number): Promise<boolean> {
-    return new Promise((resolve) => {
-      const server = net.createServer();
-
-      server.once('error', (err: NodeJS.ErrnoException) => {
-          resolve(false);
-      });
-
-      server.once('listening', () => {
-        server.close(() => resolve(true));
-      });
-
-      server.listen(port, this.serverAddress.address);
-    });
-  }
-
   private static async setServerAddress(): Promise<void> {
-    this.serverAddress.address = process.env.ADDRESS || process.env.DEBUG && "127.0.0.1" || Object.values(os.networkInterfaces())
-      .flatMap((iface) => iface ?? []) // filtre null/undefined
-      .find((addr) => addr.family === 'IPv4' && !addr.internal)
-      .address
-    if(parseInt(process.env.TCP_PORT))
-      this.serverAddress.port=parseInt(process.env.TCP_PORT);
-    else
-      while (!await this.isPortFree(this.serverAddress.port)) this.serverAddress.port++;
-    this.logger.log("address to be listened to: "+this.serverAddress.address);
-    this.logger.log("port to be listened to: "+this.serverAddress.port);
+    const { address, port } = await utils.resolveServerAddress(this.serverAddress.port, 'TCP_PORT', this.logger);
+    this.serverAddress.address = address;
+    this.serverAddress.port = port;
   }
 
   private static async startTCPMicroService(appModule): Promise<INestMicroservice> {

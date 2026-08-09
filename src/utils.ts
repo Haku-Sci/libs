@@ -1,6 +1,8 @@
 import { readFile } from 'fs/promises';
 import * as path from 'path';
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus, Logger } from '@nestjs/common';
+import * as net from 'net';
+import * as os from 'os';
 export const HAKU_SCI_RESOURCE = 'haku:resource';
 export const HAKU_SCI_ACTION = 'haku:action';
 
@@ -47,6 +49,41 @@ export async function microServiceName(): Promise<string> {
 
 export function getHttpRequestMaxSize(requestMaxSize?: string): number {
   return (parseInt(requestMaxSize ?? process.env.REQUEST_MAX_SIZE ?? '100', 10) - 10) * 1024;
+}
+
+export interface ServerAddress {
+  address: string;
+  port: number;
+}
+
+function isPortFree(port: number, address: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+
+    server.once('error', () => resolve(false));
+    server.once('listening', () => server.close(() => resolve(true)));
+
+    server.listen(port, address);
+  });
+}
+
+export async function resolveServerAddress(defaultPort: number, portEnvVar: string, logger?: Logger): Promise<ServerAddress> {
+  const address: string = process.env.ADDRESS || (process.env.DEBUG && "127.0.0.1") || Object.values(os.networkInterfaces())
+    .flatMap((iface) => iface ?? []) // filtre null/undefined
+    .find((addr) => addr.family === 'IPv4' && !addr.internal)
+    .address;
+
+  let port = defaultPort;
+  const envPort = parseInt(process.env[portEnvVar]);
+  if (!isNaN(envPort))
+    port = envPort;
+  else
+    while (!await isPortFree(port, address)) port++;
+
+  logger?.log("address to be listened to: " + address);
+  logger?.log("port to be listened to: " + port);
+
+  return { address, port };
 }
 
 export function withWatchdog<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
