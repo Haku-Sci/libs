@@ -13,16 +13,28 @@ import { DiscoveryModule, DiscoveryService } from '@golevelup/nestjs-discovery';
 @Injectable()
 export class TCPService {
     static async sendMessage(service, action: string, resource?: string, payload={}): Promise<any> {
-        const client: ClientProxy = await ClientProxyFactory.create({
-            transport: Transport.TCP,
-            options: await Consul.getServiceURI(service),
-        });
+        let client: ClientProxy;
+        try {
+            client = await ClientProxyFactory.create({
+                transport: Transport.TCP,
+                options: await Consul.getServiceURI(service),
+            });
+        } catch (err: any) {
+            const status = err?.status || err?.statusCode || HttpStatus.SERVICE_UNAVAILABLE;
+            throw new HttpException(
+                { message: err?.message || 'Unknown error', service },
+                status
+            );
+        }
         try {
             payload["sender"] = await utils.microServiceName()
             let response$ = await client.send([resource, action].join("/"), payload).pipe(
                 catchError(err => {
                     const inner = err?.error ?? err;
-                    const status = inner?.status || inner?.statusCode || err?.status || HttpStatus.BAD_REQUEST;
+                    // No status/statusCode means the remote app never got to handle the request -
+                    // the failure happened at the transport level (connection dropped, timed out),
+                    // which is a service-availability problem, not a bad request from our side.
+                    const status = inner?.status || inner?.statusCode || err?.status || HttpStatus.SERVICE_UNAVAILABLE;
                     const message =
                         (typeof inner === 'object' ? inner?.message : inner) ||
                         err?.message ||
@@ -112,6 +124,19 @@ export class TCPService {
         };
     }
 
+    private static normalizeErrors(result: any): any {
+        if (!result || typeof result !== 'object' || !('errors' in result)) return result;
+        const errors = result.errors;
+        if (!errors || Array.isArray(errors) || typeof errors !== 'object') return result;
+        return {
+            ...result,
+            errors: Object.entries(errors).map(([id, error]) => ({
+                id,
+                message: error instanceof Error ? error.message : String(error),
+            })),
+        };
+    }
+
     private static wrapHandler(
         instance: any,
         methodName: string,
@@ -127,7 +152,8 @@ export class TCPService {
                 const args: any[] = [tcpParamMeta.length > 0 ? payload : data];
                 for (const { index, name } of tcpParamMeta)
                     args[index] = params?.[name];
-                return await instance[methodName].apply(instance, args);
+                const result = await instance[methodName].apply(instance, args);
+                return TCPService.normalizeErrors(result);
             } catch (err) {
                 // Reconstruction minimale d’un ArgumentsHost RPC
                 const host: ArgumentsHost = {
