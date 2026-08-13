@@ -53,18 +53,17 @@
         
         //Collab
         {
-            "command": "npm run dev --prefix ../services/collab",
+            "command": "npm run start:dev --prefix ../services/collab",
             "name": "Collab",
             "request": "launch",
             "type": "node-terminal",
             "envFile":"${workspaceFolder}/../libs/.env",
             "env":{
-                "PORT":"4000",
-                "API_URL":"https://api.haku-test.com",
+                "WSS_PORT":"4000",
                 "ADDRESS":"collab.haku-test.com",
                 "NODE_TLS_REJECT_UNAUTHORIZED":"0",
                 "DEBOUNCE": "5000"
-            }                   
+            }
         },
          //Notification
         {
@@ -73,10 +72,11 @@
             "request": "launch",
             "type": "node-terminal",
             "envFile":"${workspaceFolder}/../libs/.env",
-            "env": {
-                "PORT":"4001",
+            "env":{                
                 "ADDRESS":"notification.haku-test.com",
-            }
+                "WSS_SSL_KEY_PATH":"./certificates/key.pem",
+                "WSS_SSL_CERT_PATH":"./certificates/cert.pem",
+            }     
         },
         //vault
         {
