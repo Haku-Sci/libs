@@ -5,7 +5,7 @@ import { readFileSync } from 'fs';
 import { IncomingMessage } from 'http';
 import { Logger } from '@nestjs/common';
 import * as utils from '../utils';
-import { TicketService } from './ticket.service';
+import { TicketService, TicketData } from './ticket.service';
 import { BridgeRegistry, BridgeContext } from './bridge-registry.service';
 import { dispatchMessage } from './utils';
 
@@ -19,6 +19,7 @@ export interface WssBootstrapOptions {
   port?: number;
   ssl?: WssSslOptions;
   onDisconnect?: (context: BridgeContext) => void;
+  onAuthenticated?: (ws: WebSocket, req: IncomingMessage, ticketData: TicketData) => void;
 }
 
 export class WssMicroservice {
@@ -26,7 +27,6 @@ export class WssMicroservice {
   private static wss: WebSocketServer;
   private static publicHost: string;
   private static publicPort: number;
-  private static ssl: boolean;
 
   static async bootstrap(options: WssBootstrapOptions = {}): Promise<WebSocketServer> {
     let server = options.server;
@@ -34,21 +34,18 @@ export class WssMicroservice {
     if (!server) {
       const address = process.env.ADDRESS || '0.0.0.0';
       const port = Number(process.env.WSS_PORT) || options.port || 3001;
-      const ssl = options.ssl ?? await this.resolveSsl();
+      const ssl = await this.resolveSsl();
       server = ssl ? https.createServer(ssl) : http.createServer();
       server.on('request', (req, res) => this.handleHttpRequest(req, res));
       server.listen(port, address);
       this.logger.log(`address to be listened to: ${address}`);
       this.logger.log(`port to be listened to: ${port}`);
-      this.logger.log(`ssl: ${ssl ? 'enabled' : 'disabled'}`);
 
       this.publicHost = process.env.WSS_URL || address;
       this.publicPort = Number(process.env.WSS_PUBLIC_PORT) || port;
-      this.ssl = !!ssl;
     } else {
       this.publicHost = process.env.WSS_URL;
       this.publicPort = Number(process.env.WSS_PUBLIC_PORT) || options.port;
-      this.ssl = !!options.ssl || server instanceof https.Server;
     }
 
     this.wss = new WebSocketServer({ server });
@@ -66,7 +63,7 @@ export class WssMicroservice {
     if (!this.publicHost) {
       throw new Error('WssMicroservice.url requested before bootstrap() (or WSS_URL is not set)');
     }
-    return `${this.ssl ? 'wss' : 'ws'}://${this.publicHost}:${this.publicPort}`;
+    return `wss://${this.publicHost}:${this.publicPort}`;
   }
 
   /**
@@ -83,7 +80,7 @@ export class WssMicroservice {
 
     if (process.env.DEBUG !== 'true') return null;
 
-    const domain = `${await utils.microServiceName()}.haku-test.com`;
+    const domain = `${await utils.microServiceName()}.${process.env.DOMAIN_NAME}`;
     return {
       key: readFileSync(`./certificates/${domain}-key.pem`),
       cert: readFileSync(`./certificates/${domain}.pem`),
@@ -102,12 +99,23 @@ export class WssMicroservice {
   }
 
   private static handleConnection(ws: WebSocket, req: IncomingMessage, options: WssBootstrapOptions): void {
-    const url = new URL(req.url ?? '', 'http://localhost');
+    const rawUrl = req.url ?? '';
+    const firstQuestionMark = rawUrl.indexOf('?');
+    const normalizedUrl = firstQuestionMark === -1
+      ? rawUrl
+      : rawUrl.slice(0, firstQuestionMark + 1) + rawUrl.slice(firstQuestionMark + 1).replace(/\?/g, '&');
+    req.url = normalizedUrl;
+    const url = new URL(normalizedUrl, 'http://localhost');
     const ticket = url.searchParams.get('ticket');
     const ticketData = ticket ? TicketService.consume(ticket) : null;
 
     if (!ticketData) {
-      ws.close(4001, 'invalid or expired ticket');
+      ws.close(4401, 'invalid or expired ticket');
+      return;
+    }
+
+    if (options.onAuthenticated) {
+      options.onAuthenticated(ws, req, ticketData);
       return;
     }
 
