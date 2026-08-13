@@ -1,0 +1,25 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Start local tools and wait",
+            "type": "shell",
+            "command": "python ${workspaceFolder}/local-tools/start-local-tools.py neo4j postgres",
+            "isBackground": true,
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "no-diagnostics-produced-by-this-task"
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "run start consul",
+                    "endsPattern": "Synced node info"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        }
+    ]
+}
