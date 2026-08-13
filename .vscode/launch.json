@@ -158,8 +158,11 @@
             "type": "node-terminal",
             "request": "launch",
             "command": "mvn clean package; python ${workspaceFolder}/../libs/local-tools/containers/start-container.py neo4j --restart",
-            "cwd": "${workspaceFolder}/../services/graph/plugins"
-        },        
+            "cwd": "${workspaceFolder}/../services/graph/plugins",
+            "env": {
+                "MAX_VISITED_ITEMS": "20"
+            }
+        },
     ],
     "inputs": [        
         {
