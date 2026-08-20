@@ -1,5 +1,5 @@
 import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
-import { TCP_PARAM_METADATA_KEY } from './tcp-param.decorator';
+import { TCP_PARAM_METADATA_KEY, TCP_SENDER_METADATA_KEY } from './tcp-param.decorator';
 import { catchError, lastValueFrom, throwError, timeout, defaultIfEmpty } from 'rxjs';
 import * as utils from '../utils'
 import { Consul } from '../microservice/consul';
@@ -145,13 +145,32 @@ export class TCPService {
         const prototype = Object.getPrototypeOf(instance);
         const tcpParamMeta: Array<{ index: number; name: string }> =
             Reflect.getMetadata(TCP_PARAM_METADATA_KEY, prototype, methodName) ?? [];
+        const senderParamIndex: number | undefined =
+            Reflect.getMetadata(TCP_SENDER_METADATA_KEY, prototype, methodName);
 
         return async function boundHandler(data: any, context: any) {
             try {
-                const { params, ...payload } = data ?? {};
-                const args: any[] = [tcpParamMeta.length > 0 ? payload : data];
+                const { sender, ...rest } = data ?? {};
+                let payload = rest;
+                let params: any;
+                if (tcpParamMeta.length > 0)
+                    ({ params, ...payload } = rest);
+
+                const reservedIndexes = new Set(tcpParamMeta.map(({ index }) => index));
+                if (senderParamIndex !== undefined) reservedIndexes.add(senderParamIndex);
+                const paramCount = Math.max(
+                    instance[methodName].length,
+                    ...[...reservedIndexes].map(i => i + 1),
+                );
+                let payloadIndex = 0;
+                while (reservedIndexes.has(payloadIndex) && payloadIndex < paramCount) payloadIndex++;
+
+                const args: any[] = [];
+                args[payloadIndex] = payload;
                 for (const { index, name } of tcpParamMeta)
                     args[index] = params?.[name];
+                if (senderParamIndex !== undefined)
+                    args[senderParamIndex] = sender;
                 const result = await instance[methodName].apply(instance, args);
                 return TCPService.normalizeErrors(result);
             } catch (err) {
