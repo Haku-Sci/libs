@@ -96,10 +96,15 @@ export class TCPService {
         for (const key of handlers.keys()) {
             if (!key.includes(':')) continue;
             const paramNames: string[] = [];
-            const regexStr = key.replace(/:([^/]+)/g, (_, name) => {
-                paramNames.push(name);
-                return '([^/]+)';
-            });
+            const regexStr = key
+                .replace(/\/\{:([^}]+)\}/g, (_, name) => {
+                    paramNames.push(name);
+                    return '(?:/([^/]+))?';
+                })
+                .replace(/:([^/]+)/g, (_, name) => {
+                    paramNames.push(name);
+                    return '([^/]+)';
+                });
             paramPatterns.push({ regex: new RegExp(`^${regexStr}$`), paramNames, registeredKey: key });
         }
 
@@ -116,7 +121,7 @@ export class TCPService {
                 const originalHandler = originalGetHandler(registeredKey);
                 if (!originalHandler) continue;
 
-                const params: Record<string, string> = {};
+                const params: Record<string, string | undefined> = {};
                 paramNames.forEach((name, i) => { params[name] = match[i + 1]; });
                 return (data: any, ctx: any) => originalHandler({ ...data, params }, ctx);
             }
