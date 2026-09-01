@@ -96,15 +96,19 @@ export class TCPService {
         for (const key of handlers.keys()) {
             if (!key.includes(':')) continue;
             const paramNames: string[] = [];
-            const regexStr = key
-                .replace(/\/\{:([^}]+)\}/g, (_, name) => {
-                    paramNames.push(name);
-                    return '(?:/([^/]+))?';
-                })
-                .replace(/:([^/]+)/g, (_, name) => {
-                    paramNames.push(name);
+            // Single left-to-right pass keeps paramNames aligned with capture-group order and
+            // matches an optional `/{:name}` before the bare `:name` nested in it.
+            const regexStr = key.replace(
+                /\/\{:([A-Za-z0-9_]+)\}|:([A-Za-z0-9_]+)/g,
+                (_, optionalName, requiredName) => {
+                    if (optionalName) {
+                        paramNames.push(optionalName);
+                        return '(?:/([^/]+))?';
+                    }
+                    paramNames.push(requiredName);
                     return '([^/]+)';
-                });
+                },
+            );
             paramPatterns.push({ regex: new RegExp(`^${regexStr}$`), paramNames, registeredKey: key });
         }
 
