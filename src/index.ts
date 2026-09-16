@@ -1,4 +1,5 @@
 export * from './microservice/microservice.service';
+export * from './microservice/consul';
 export * from './TCP/tcp.service';
 export * from './TCP/tcp.module';
 export * from './TCP/restrict-sender.decorator';
