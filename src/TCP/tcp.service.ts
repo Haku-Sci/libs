@@ -13,11 +13,21 @@ import { DiscoveryModule, DiscoveryService } from '@golevelup/nestjs-discovery';
 @Injectable()
 export class TCPService {
     static async sendMessage(service, action: string, resource?: string, payload={}): Promise<any> {
+        try {
+            return await TCPService.trySendMessage(service, action, resource, payload, false);
+        } catch (err: any) {
+            if (err instanceof HttpException && err.getStatus() === HttpStatus.SERVICE_UNAVAILABLE)
+                return await TCPService.trySendMessage(service, action, resource, payload, true);
+            throw err;
+        }
+    }
+
+    private static async trySendMessage(service, action: string, resource: string, payload: any, forceRefresh: boolean): Promise<any> {
         let client: ClientProxy;
         try {
             client = await ClientProxyFactory.create({
                 transport: Transport.TCP,
-                options: await Consul.getServiceURI(service),
+                options: await Consul.getServiceURI(service, forceRefresh),
             });
         } catch (err: any) {
             const status = err?.status || err?.statusCode || HttpStatus.SERVICE_UNAVAILABLE;

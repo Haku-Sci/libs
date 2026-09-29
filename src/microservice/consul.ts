@@ -13,6 +13,8 @@ const SERVER_CLASS_TRANSPORTS = new Map<Function, string>([
 ]);
 
 export class Consul {
+  private static readonly serviceURICache = new Map<string, { host: string, port: number }>();
+
   static async registerService(server: net.AddressInfo | net.Server, logger: Logger) {
     if (!process.env["CONSUL_URL"])
       return;
@@ -49,19 +51,23 @@ export class Consul {
     logger.log(`Service registered with Consul on ${externalAddress}:${externalPort}`);
   }
 
-  static async getServiceURI(serviceName: string): Promise<{ host: string, port: number }> {
+  static async getServiceURI(serviceName: string, forceRefresh = false): Promise<{ host: string, port: number }> {
+    if (!forceRefresh && Consul.serviceURICache.has(serviceName))
+      return Consul.serviceURICache.get(serviceName);
+
     const response = await axios.get(`${process.env["CONSUL_URL"]}/v1/catalog/service/${serviceName}`);
     const serviceInfo = response.data;
 
     if (serviceInfo.length > 0) {
       const service = serviceInfo[0];
-      const address = service.ServiceAddress || service.Address;
-      const port = service.ServicePort;
-      return {
-        host: address,
-        port: port,
+      const uri = {
+        host: service.ServiceAddress || service.Address,
+        port: service.ServicePort,
       };
+      Consul.serviceURICache.set(serviceName, uri);
+      return uri;
     } else {
+      Consul.serviceURICache.delete(serviceName);
       throw new ServiceUnavailableException(`Service ${serviceName} not found in Consul catalog`);
     }
   }
