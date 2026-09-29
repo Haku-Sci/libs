@@ -133,10 +133,13 @@
         },        
         //Data-processing
         {
-            "command": "python ${workspaceFolder}/../services/data-processing/app/main.py",
             "name": "Data-processing",
+            "type": "debugpy",
             "request": "launch",
-            "type": "node-terminal",
+            "program": "${workspaceFolder}/../services/data-processing/app/main.py",
+            "cwd": "${workspaceFolder}/../services/data-processing/app",
+            "console": "integratedTerminal",
+            "justMyCode": true,
             "envFile":"${workspaceFolder}/../libs/.env",
             "env": {
                 "CONSUL_URL":"http://hubs.haku-test.com:8500"
