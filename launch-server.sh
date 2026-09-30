@@ -28,7 +28,6 @@ sleep 15
 
 # ── 2. Api ────────────────────────────────────────────────────────────────────
 log "Starting Api..."
-GATEWAY_HOST=localhost \
 PORT=443 \
 ADDRESS=api.haku-test.com \
 CORS_ORIGINS="https://www.haku-test.com https://haku-test.com" \
