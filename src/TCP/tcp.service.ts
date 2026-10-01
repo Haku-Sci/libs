@@ -4,25 +4,33 @@ import { catchError, lastValueFrom, throwError, timeout, defaultIfEmpty } from '
 import * as utils from '../utils'
 import { Consul } from '../microservice/consul';
 
-import { ArgumentsHost, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AllExceptionsFilter } from '../microservice/exceptionFilter';
 import { PATTERN_METADATA } from '@nestjs/microservices/constants';
 import { PATH_METADATA } from '@nestjs/common/constants';
 import { DiscoveryModule, DiscoveryService } from '@golevelup/nestjs-discovery';
+import { RemoteServiceException } from './remote-service.exception';
+
+// Transport failures proving the request never reached the remote handler: only these are safe to retry.
+const UNDELIVERED_ERROR_CODES = new Set(['ECONNREFUSED', 'EHOSTUNREACH', 'ENOTFOUND', 'EAI_AGAIN']);
+
+class UndeliveredMessageException extends HttpException { }
 
 @Injectable()
 export class TCPService {
     static async sendMessage(service, action: string, resource?: string, payload={}): Promise<any> {
+        // Taken before any await, so a failure of the called handler points at the code that called it.
+        const callSite = new Error().stack?.split('\n').slice(2).join('\n');
         try {
-            return await TCPService.trySendMessage(service, action, resource, payload, false);
+            return await TCPService.trySendMessage(service, action, resource, payload, false, callSite);
         } catch (err: any) {
-            if (err instanceof HttpException && err.getStatus() === HttpStatus.SERVICE_UNAVAILABLE)
-                return await TCPService.trySendMessage(service, action, resource, payload, true);
+            if (err instanceof UndeliveredMessageException)
+                return await TCPService.trySendMessage(service, action, resource, payload, true, callSite);
             throw err;
         }
     }
 
-    private static async trySendMessage(service, action: string, resource: string, payload: any, forceRefresh: boolean): Promise<any> {
+    private static async trySendMessage(service, action: string, resource: string, payload: any, forceRefresh: boolean, callSite: string): Promise<any> {
         let client: ClientProxy;
         try {
             client = await ClientProxyFactory.create({
@@ -31,7 +39,7 @@ export class TCPService {
             });
         } catch (err: any) {
             const status = err?.status || err?.statusCode || HttpStatus.SERVICE_UNAVAILABLE;
-            throw new HttpException(
+            throw new UndeliveredMessageException(
                 { message: err?.message || 'Unknown error', service },
                 status
             );
@@ -41,10 +49,9 @@ export class TCPService {
             let response$ = await client.send([resource, action].join("/"), payload).pipe(
                 catchError(err => {
                     const inner = err?.error ?? err;
-                    // No status/statusCode means the remote app never got to handle the request -
-                    // the failure happened at the transport level (connection dropped, timed out),
-                    // which is a service-availability problem, not a bad request from our side.
-                    const status = inner?.status || inner?.statusCode || err?.status || HttpStatus.SERVICE_UNAVAILABLE;
+                    const undelivered = UNDELIVERED_ERROR_CODES.has(err?.code);
+                    const status = inner?.status || inner?.statusCode || err?.status ||
+                        (undelivered ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.INTERNAL_SERVER_ERROR);
                     const message =
                         (typeof inner === 'object' ? inner?.message : inner) ||
                         err?.message ||
@@ -54,9 +61,11 @@ export class TCPService {
                         message,
                         service,
                     };
-                    return throwError(
-                        () => new HttpException(payload, status)
-                    );
+                    if (undelivered)
+                        return throwError(() => new UndeliveredMessageException(payload, status));
+                    const remote = new RemoteServiceException(payload, status);
+                    remote.stack = `${remote.name}: ${remote.message}\n${callSite}`;
+                    return throwError(() => remote);
                 })
             );
             const watchdogTimeout = parseInt(process.env.WATCHDOG);
@@ -159,7 +168,7 @@ export class TCPService {
     private static wrapHandler(
         instance: any,
         methodName: string,
-        logger: Logger
+        logger: Logger,
     ): (...args: any[]) => any {
         const prototype = Object.getPrototypeOf(instance);
         const tcpParamMeta: Array<{ index: number; name: string }> =
@@ -167,7 +176,7 @@ export class TCPService {
         const senderParamIndex: number | undefined =
             Reflect.getMetadata(TCP_SENDER_METADATA_KEY, prototype, methodName);
 
-        return async function boundHandler(data: any, context: any) {
+        return async function boundHandler(data: any) {
             try {
                 const { sender, ...rest } = data ?? {};
                 let payload = rest;
@@ -193,16 +202,9 @@ export class TCPService {
                 const result = await instance[methodName].apply(instance, args);
                 return TCPService.normalizeErrors(result);
             } catch (err) {
-                // Reconstruction minimale d’un ArgumentsHost RPC
-                const host: ArgumentsHost = {
-                    switchToRpc: () => ({ getContext: () => context }),
-                    getArgByIndex: (i: number) => (i === 0 ? data : context),
-                    // les autres méthodes ne seront pas utilisées ici
-                } as any;
-
                 // Renvoi de l’Observable d’erreur produit par le filtre
-                return new AllExceptionsFilter(logger).catch(err, host);
+                return new AllExceptionsFilter(logger).catch(err);
             }
-        };
+        }
     }
 }
