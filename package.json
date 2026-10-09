@@ -1,22 +1,22 @@
 {
   "name": "@haku-sci/utils",
-  "version": "9.0.0",
+  "version": "11.0.0",
   "description": "utils from haku-sci. Library only",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
   "peerdependencies": {
-    "@nestjs/common": "^11.0.6",
-    "@nestjs/core": "^11.0.6",
-    "@nestjs/microservices": "^11.0.6",
-    "@nestjs/platform-express": "^11.0.6",
-    "@nestjs/typeorm": "^11.0.0",
+    "@nestjs/common": "^12.0.0",
+    "@nestjs/core": "^12.0.0",
+    "@nestjs/microservices": "^12.0.0",
+    "@nestjs/platform-express": "^12.0.0",
+    "@nestjs/typeorm": "^12.0.0",
     "pg": "^8.15.6",
     "utils": "^0.3.1"
   },
   "dependencies": {
-    "@golevelup/nestjs-discovery": "^4.0.3",
-    "@golevelup/nestjs-rabbitmq": "^5.7.0",
-    "@nestjs/microservices": "^11.1.17",
+    "@golevelup/nestjs-discovery": "^7.1.0",
+    "@golevelup/nestjs-rabbitmq": "^9.1.0",
+    "@nestjs/microservices": "^12.0.0",
     "amqp-connection-manager": "^4.1.14",
     "amqplib": "^0.10.8",
     "axios": "^1.9.0",
@@ -24,7 +24,7 @@
     "ws": "^8.21.2"
   },
   "devDependencies": {
-    "@nestjs/testing": "^11.0.6",
+    "@nestjs/testing": "^12.0.0",
     "@types/jest": "^29.5.12",
     "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1",
