@@ -14,6 +14,7 @@ const SERVER_CLASS_TRANSPORTS = new Map<Function, string>([
 
 export class Consul {
   private static readonly serviceURICache = new Map<string, { host: string, port: number }>();
+  private static readonly logger = new Logger(Consul.name);
 
   static async registerService(server: net.AddressInfo | net.Server, logger: Logger) {
     if (!process.env["CONSUL_URL"])
@@ -55,7 +56,18 @@ export class Consul {
     if (!forceRefresh && Consul.serviceURICache.has(serviceName))
       return Consul.serviceURICache.get(serviceName);
 
-    const response = await axios.get(`${process.env["CONSUL_URL"]}/v1/catalog/service/${serviceName}`);
+    const url = `${process.env["CONSUL_URL"]}/v1/catalog/service/${serviceName}`;
+    let response = await axios.get(url);
+    // A refresh means the known address just failed: the service may be restarting, so block on
+    // the catalog (Consul blocking query) until it re-registers or CONSUL_WAIT elapses.
+    const deadline = Date.now() + (parseInt(process.env.CONSUL_WAIT) || 10000);
+    if (forceRefresh && response.data.length === 0)
+      Consul.logger.warn(`Service ${serviceName} missing from Consul catalog, waiting for it to register`);
+    while (forceRefresh && response.data.length === 0 && Date.now() < deadline) {
+      response = await axios.get(url, {
+        params: { index: response.headers['x-consul-index'], wait: `${deadline - Date.now()}ms` },
+      });
+    }
     const serviceInfo = response.data;
 
     if (serviceInfo.length > 0) {

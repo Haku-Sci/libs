@@ -1,4 +1,5 @@
 export * from './microservice/microservice.service';
+export * from './microservice/exceptionFilter';
 export * from './microservice/consul';
 export * from './TCP/tcp.service';
 export * from './TCP/remote-service.exception';
