@@ -6,7 +6,7 @@
     "compounds": [
         {
             "name": "Start all services",
-            "configurations": ["Front", "Api", "Collab", "Vault", "Graph", "Third-party", "Data-processing", "Notification"],
+            "configurations": ["Front", "Api", "Collab", "Vault", "Graph", "Third-party", "Data-processing", "Notification", "Logs"],
             "preLaunchTask": "Start local tools and wait",
             "stopAll": true
         }
@@ -44,7 +44,6 @@
             "type": "node-terminal",
             "envFile":"${workspaceFolder}/../libs/.env",
             "env": {
-                "GATEWAY_HOST": "localhost",
                 "PORT":"443",
                 "ADDRESS":"api.haku-test.com",
                 "CORS_ORIGINS":"https://www.haku-test.com https://haku-test.com",
@@ -130,7 +129,18 @@
                 "ALLAS_OPENSTACK_ENDPOINT":"https://pouta.csc.fi:5001/v3",
                 "SIGNED_URL_DURATION": "1"
             }
-        },        
+        },
+        //Logs
+        {
+            "command": "npm run start:dev --prefix ../services/logs",
+            "name": "Logs",
+            "request": "launch",
+            "type": "node-terminal",
+            "envFile":"${workspaceFolder}/../libs/.env",
+            "env": {
+                "LOGS_DATABASE_PATH": "data/logs.sqlite"
+            }
+        },
         //Data-processing
         {
             "name": "Data-processing",
