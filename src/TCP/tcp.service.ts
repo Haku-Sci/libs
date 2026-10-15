@@ -12,9 +12,9 @@ import { DiscoveryModule, DiscoveryService } from '@golevelup/nestjs-discovery';
 import { RemoteServiceException } from './remote-service.exception';
 
 // Transport failures proving the request never reached the remote handler: only these are safe to retry.
-const UNDELIVERED_ERROR_CODES = new Set(['ECONNREFUSED', 'EHOSTUNREACH', 'ENOTFOUND', 'EAI_AGAIN']);
+export const UNDELIVERED_ERROR_CODES = new Set(['ECONNREFUSED', 'EHOSTUNREACH', 'ENOTFOUND', 'EAI_AGAIN']);
 
-class UndeliveredMessageException extends HttpException { }
+export class UndeliveredMessageException extends HttpException { }
 
 @Injectable()
 export class TCPService {
@@ -40,7 +40,7 @@ export class TCPService {
         } catch (err: any) {
             const status = err?.status || err?.statusCode || HttpStatus.SERVICE_UNAVAILABLE;
             throw new UndeliveredMessageException(
-                { message: err?.message || 'Unknown error', service },
+                { message: err?.message || 'Unknown error', code: err?.code, service },
                 status
             );
         }

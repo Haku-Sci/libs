@@ -6,6 +6,8 @@ export interface HakuError {
   service?: string;
   message: string;
   status?: number;
+  /** The error's own code, when it has one (e.g. Node's ECONNREFUSED). */
+  code?: string;
   stack?: string;
   cause?: HakuError;
 }
@@ -17,6 +19,8 @@ export function toHakuError(error: any, service?: string): HakuError {
     service,
     message: error?.message ?? String(error),
     status: error?.getStatus?.() ?? error?.status ?? error?.statusCode,
+    // A relayed error keeps its code in its own layer (cause), not lifted into this one.
+    code: error?.code ?? (error instanceof RemoteServiceException ? undefined : error?.getResponse?.()?.code),
     stack: error?.stack,
     cause: error instanceof RemoteServiceException ? (error.getResponse() as HakuError) : undefined,
   };
