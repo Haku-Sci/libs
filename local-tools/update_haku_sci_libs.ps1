@@ -3,6 +3,14 @@ $libPackageJson = Get-Content "$PSScriptRoot\..\package.json" -Raw | ConvertFrom
 $expectedVersion = $libPackageJson.version
 Write-Host "Local @haku-sci/utils version: $expectedVersion" -ForegroundColor Yellow
 
+# Clean the npm cache first so no stale metadata or tarball is reused
+Write-Host "Cleaning npm cache..." -ForegroundColor Yellow
+npm cache clean --force
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Could not clean the npm cache." -ForegroundColor Red
+    exit 1
+}
+
 # Resolve the actual latest version from the registry (bypasses npm's local metadata cache,
 # which can otherwise make `@latest` resolve to a stale version)
 $registryLatest = (npm view @haku-sci/utils version --prefer-online).Trim()
