@@ -4,12 +4,14 @@ import { catchError, lastValueFrom, throwError, timeout, defaultIfEmpty } from '
 import * as utils from '../utils'
 import { Consul } from '../microservice/consul';
 
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger, MisdirectedException } from '@nestjs/common';
 import { AllExceptionsFilter } from '../microservice/exceptionFilter';
-import { PATTERN_METADATA } from '@nestjs/microservices/constants';
+import { NO_MESSAGE_HANDLER, PATTERN_METADATA } from '@nestjs/microservices/constants';
 import { PATH_METADATA } from '@nestjs/common/constants';
 import { DiscoveryModule, DiscoveryService } from '@golevelup/nestjs-discovery';
 import { RemoteServiceException } from './remote-service.exception';
+import { RESTRICT_SENDER_KEY } from './restrict-sender.decorator';
+import { assertSenderAllowed } from './restrict-sender.interceptor';
 
 // Transport failures proving the request never reached the remote handler: only these are safe to retry.
 export const UNDELIVERED_ERROR_CODES = new Set(['ECONNREFUSED', 'EHOSTUNREACH', 'ENOTFOUND', 'EAI_AGAIN']);
@@ -46,16 +48,23 @@ export class TCPService {
         }
         try {
             payload["sender"] = await utils.microServiceName()
+            // The service meant to answer, out of band (packet metadata, not the payload): the one
+            // reached checks it is that service before running any handler (see guardReceiver).
+            client.setOnDispatchHook((packet) => { packet.metadata = { receiver: service }; });
             let response$ = await client.send([resource, action].join("/"), payload).pipe(
                 catchError(err => {
                     const inner = err?.error ?? err;
-                    const undelivered = UNDELIVERED_ERROR_CODES.has(err?.code);
-                    const status = inner?.status || inner?.statusCode || err?.status ||
-                        (undelivered ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.INTERNAL_SERVER_ERROR);
                     const message =
                         (typeof inner === 'object' ? inner?.message : inner) ||
                         err?.message ||
                         'Unknown error';
+                    const remoteStatus = inner?.status || inner?.statusCode || err?.status;
+                    // Reaching another service than the one called (its cached address was taken over,
+                    // e.g. by a restart on another port) ran nothing, so refresh the address and retry.
+                    const undelivered = UNDELIVERED_ERROR_CODES.has(err?.code) ||
+                        message === NO_MESSAGE_HANDLER || remoteStatus === HttpStatus.MISDIRECTED;
+                    const status = remoteStatus ||
+                        (undelivered ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.INTERNAL_SERVER_ERROR);
                     const payload = {
                         ...(typeof inner === 'object' ? inner : {}),
                         message,
@@ -73,8 +82,19 @@ export class TCPService {
                 response$ = response$.pipe(timeout({ first: watchdogTimeout }));
             response$ = response$.pipe(defaultIfEmpty(null));
             const result = await lastValueFrom(response$);
-            if ((result as any)?.error)
-                throwError(() => new Error(`[${service}] ${(result as any).message}`));
+            // Some services (e.g. data-processing) return their failure as a result: { error, message? },
+            // error being a HakuError or a plain message.
+            const resultError = (result as any)?.error;
+            if (resultError) {
+                const remote = new RemoteServiceException(
+                    typeof resultError === 'object'
+                        ? { ...resultError, service }
+                        : { message: (result as any).message ?? resultError, service },
+                    resultError?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+                );
+                remote.stack = `${remote.name}: ${remote.message}\n${callSite}`;
+                throw remote;
+            }
             return result;
         }
         finally {
@@ -105,7 +125,25 @@ export class TCPService {
             }
         }
         TCPService.enablePatternRouting(app.serverInstance);
+        TCPService.guardReceiver(app.serverInstance, await utils.microServiceName(), logger);
         logger.log("HakuSci Message Handlers initialized")
+    }
+
+    // Every handler, whatever its pattern, first checks the message was meant for this service
+    // (packet metadata set by sendMessage). A message without receiver (older caller) passes.
+    private static guardReceiver(server: any, ownName: string, logger: Logger) {
+        const getHandler = server.getHandlerByPattern.bind(server);
+        server.getHandlerByPattern = (pattern: string) => {
+            const handler = getHandler(pattern);
+            if (!handler) return handler;
+            return Object.assign((data: any, ctx: any) => {
+                const receiver = ctx?.getMetadata?.()?.receiver;
+                if (receiver && receiver !== ownName)
+                    return new AllExceptionsFilter(logger).catch(
+                        new MisdirectedException(`Message for ${receiver} reached ${ownName}`));
+                return handler(data, ctx);
+            }, handler);
+        };
     }
 
     private static enablePatternRouting(server: any) {
@@ -175,10 +213,14 @@ export class TCPService {
             Reflect.getMetadata(TCP_PARAM_METADATA_KEY, prototype, methodName) ?? [];
         const senderParamIndex: number | undefined =
             Reflect.getMetadata(TCP_SENDER_METADATA_KEY, prototype, methodName);
+        // These handlers bypass Nest's interceptors, so @RestrictSender is enforced here.
+        const methodRestriction = Reflect.getMetadata(RESTRICT_SENDER_KEY, prototype[methodName]);
+        const classRestriction = Reflect.getMetadata(RESTRICT_SENDER_KEY, instance.constructor);
 
         return async function boundHandler(data: any) {
             try {
                 const { sender, ...rest } = data ?? {};
+                assertSenderAllowed(methodRestriction, classRestriction, sender);
                 let payload = rest;
                 let params: any;
                 if (tcpParamMeta.length > 0)
