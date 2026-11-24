@@ -15,7 +15,6 @@ import sys
 from pathlib import Path
 from urllib.parse import quote
 
-# Explicit: this script lives in a junctioned folder, so it cannot locate libs/.env relatively.
 ENV_FILE = Path(os.environ.get("HAKU_ENV_FILE", "D:/Haku-Sci/libs/.env"))
 
 # Pinned versions: unpinned uvx pulled a postgres-mcp release incompatible with mcp 2.x.

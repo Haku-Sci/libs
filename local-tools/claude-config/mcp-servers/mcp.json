@@ -3,49 +3,49 @@
     "neo4j": {
       "type": "stdio",
       "command": "python",
-      "args": ["-I", "D:/Haku-Sci/services/.claude/scripts/mcp-launch.py", "neo4j"],
+      "args": ["-I", "D:/Haku-Sci/libs/local-tools/claude-config/mcp-servers/mcp-launch.py", "neo4j"],
       "env": {}
     },
     "postgres": {
       "type": "stdio",
       "command": "python",
-      "args": ["-I", "D:/Haku-Sci/services/.claude/scripts/mcp-launch.py", "postgres"],
+      "args": ["-I", "D:/Haku-Sci/libs/local-tools/claude-config/mcp-servers/mcp-launch.py", "postgres"],
       "env": {}
     },
     "postgres-test": {
       "type": "stdio",
       "command": "python",
-      "args": ["-I", "D:/Haku-Sci/services/.claude/scripts/mcp-launch.py", "postgres-test"],
+      "args": ["-I", "D:/Haku-Sci/libs/local-tools/claude-config/mcp-servers/mcp-launch.py", "postgres-test"],
       "env": {}
     },
     "postgres-db-test": {
       "type": "stdio",
       "command": "python",
-      "args": ["-I", "D:/Haku-Sci/services/.claude/scripts/mcp-launch.py", "postgres-db:test"],
+      "args": ["-I", "D:/Haku-Sci/libs/local-tools/claude-config/mcp-servers/mcp-launch.py", "postgres-db:test"],
       "env": {}
     },
     "postgres-db-third-party": {
       "type": "stdio",
       "command": "python",
-      "args": ["-I", "D:/Haku-Sci/services/.claude/scripts/mcp-launch.py", "postgres-db:third-party"],
+      "args": ["-I", "D:/Haku-Sci/libs/local-tools/claude-config/mcp-servers/mcp-launch.py", "postgres-db:third-party"],
       "env": {}
     },
     "postgres-db-vault": {
       "type": "stdio",
       "command": "python",
-      "args": ["-I", "D:/Haku-Sci/services/.claude/scripts/mcp-launch.py", "postgres-db:vault"],
+      "args": ["-I", "D:/Haku-Sci/libs/local-tools/claude-config/mcp-servers/mcp-launch.py", "postgres-db:vault"],
       "env": {}
     },
     "postgres-test-db-vault": {
       "type": "stdio",
       "command": "python",
-      "args": ["-I", "D:/Haku-Sci/services/.claude/scripts/mcp-launch.py", "postgres-test-db:vault"],
+      "args": ["-I", "D:/Haku-Sci/libs/local-tools/claude-config/mcp-servers/mcp-launch.py", "postgres-test-db:vault"],
       "env": {}
     },
     "dropbox-local": {
       "type": "stdio",
       "command": "node",
-      "args": ["D:/Haku-Sci/libs/local-tools/dropbox-mcp/server.mjs"],
+      "args": ["D:/Haku-Sci/libs/local-tools/claude-config/mcp-servers/dropbox-mcp/server.mjs"],
       "env": { "CLAUDE_DROPBOX_WRITE": "1" }
     },
     "playwright": {

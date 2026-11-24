@@ -45,10 +45,10 @@ if (Test-Path $oldClaudeMd) { Backup-Item $oldClaudeMd }
 Write-Host "==> $Workspace\.mcp.json"
 $mcp = Join-Path $Workspace '.mcp.json'
 if (Test-Path $mcp) {
-    $same = (Get-FileHash $mcp).Hash -eq (Get-FileHash (Join-Path $PSScriptRoot 'mcp.json')).Hash
+    $same = (Get-FileHash $mcp).Hash -eq (Get-FileHash (Join-Path $PSScriptRoot 'mcp-servers\mcp.json')).Hash
     if (-not $same) { Backup-Item $mcp }
 }
-Copy-Item (Join-Path $PSScriptRoot 'mcp.json') $mcp -Force
+Copy-Item (Join-Path $PSScriptRoot 'mcp-servers\mcp.json') $mcp -Force
 
 Write-Host '==> git pre-push /qa gate'
 $gate = (Join-Path $PSScriptRoot 'git-hooks\qa-gate.js') -replace '\\', '/'

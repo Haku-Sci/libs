@@ -1,0 +1,15 @@
+{
+  "name": "haku-dropbox-mcp",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Local dev tooling: stdio MCP server exposing Dropbox to Claude. Not part of any Haku-Sci service.",
+  "scripts": {
+    "auth": "node auth.mjs",
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "4.6.7"
+  }
+}
