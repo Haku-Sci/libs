@@ -1,0 +1,3 @@
+# Dependency overrides for the uvx-launched MCP servers (see mcp-launch.py).
+# postgres-mcp 0.3.0 pins pglast==7.2, which is no longer on PyPI.
+pglast==7.21

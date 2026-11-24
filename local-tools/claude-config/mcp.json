@@ -1,0 +1,67 @@
+{
+  "mcpServers": {
+    "neo4j": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["-I", "D:/Haku-Sci/services/.claude/scripts/mcp-launch.py", "neo4j"],
+      "env": {}
+    },
+    "postgres": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["-I", "D:/Haku-Sci/services/.claude/scripts/mcp-launch.py", "postgres"],
+      "env": {}
+    },
+    "postgres-test": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["-I", "D:/Haku-Sci/services/.claude/scripts/mcp-launch.py", "postgres-test"],
+      "env": {}
+    },
+    "postgres-db-test": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["-I", "D:/Haku-Sci/services/.claude/scripts/mcp-launch.py", "postgres-db:test"],
+      "env": {}
+    },
+    "postgres-db-third-party": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["-I", "D:/Haku-Sci/services/.claude/scripts/mcp-launch.py", "postgres-db:third-party"],
+      "env": {}
+    },
+    "postgres-db-vault": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["-I", "D:/Haku-Sci/services/.claude/scripts/mcp-launch.py", "postgres-db:vault"],
+      "env": {}
+    },
+    "postgres-test-db-vault": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["-I", "D:/Haku-Sci/services/.claude/scripts/mcp-launch.py", "postgres-test-db:vault"],
+      "env": {}
+    },
+    "dropbox-local": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["D:/Haku-Sci/libs/local-tools/dropbox-mcp/server.mjs"],
+      "env": { "CLAUDE_DROPBOX_WRITE": "1" }
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@0.0.83",
+        "--blocked-origins",
+        "https://haku-sci.com;https://www.haku-sci.com;https://api.haku-sci.com;https://collab.haku-sci.com;https://notification.haku-sci.com;https://git.haku-sci.com;https://test.haku-sci.com;https://test.api.haku-sci.com;https://test.collab.haku-sci.com",
+        "--console-level",
+        "error",
+        "--output-dir",
+        "D:/Haku-Sci/tests/.playwright-mcp"
+      ],
+      "env": {}
+    }
+  }
+}

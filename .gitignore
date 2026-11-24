@@ -6,3 +6,9 @@ tsconfig.tsbuildinfo
 package-lock.json
 graphify-out/**
 local-tools/containers/neo4j-data-backup/**
+
+# Machine-local state of the Claude config (local-tools/claude-config/.claude is junctioned into services/.claude)
+local-tools/claude-config/.claude/settings.local.json
+local-tools/claude-config/.claude/state/
+local-tools/claude-config/.claude/logs/
+local-tools/claude-config/.claude/scheduled_tasks.lock

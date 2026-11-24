@@ -1,0 +1,145 @@
+{
+  "env": {
+    "MCP_TIMEOUT": "90000"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(git -C * status*)",
+      "Bash(git -C * diff*)",
+      "Bash(git -C * log*)",
+      "Bash(git -C * show*)",
+      "Bash(git -C * branch*)",
+      "Bash(git rev-parse*)",
+      "Bash(git merge-base*)",
+      "Bash(git ls-files*)",
+      "Bash(git blame*)",
+      "Bash(git -C * rev-parse*)",
+      "Bash(git -C * merge-base*)",
+      "Bash(git -C * ls-files*)",
+      "Bash(git -C * blame*)",
+      "PowerShell(git status*)",
+      "PowerShell(git diff*)",
+      "PowerShell(git log*)",
+      "PowerShell(git show*)",
+      "PowerShell(git rev-parse*)",
+      "PowerShell(git -C * status*)",
+      "PowerShell(git -C * diff*)",
+      "PowerShell(git -C * log*)",
+      "PowerShell(cd *)",
+      "PowerShell(Set-Location *)",
+      "PowerShell(Select-String*)",
+      "PowerShell(Push-Location *)",
+      "PowerShell(Pop-Location*)",
+      "Bash(cd *)",
+      "Bash(sed -n *)",
+      "Bash(node \"$CLAUDE_PROJECT_DIR/.claude/scripts/changeset.js\"*)",
+      "Bash(node \"$CLAUDE_PROJECT_DIR/.claude/scripts/stack.js\"*)",
+      "Bash(node .claude/scripts/stack.js*)",
+      "Bash(node D:/Haku-Sci/services/.claude/scripts/stack.js*)",
+      "Bash(git -C * add -- *)",
+      "mcp__playwright__*",
+      "Edit(//d/Haku-Sci/tests/**)",
+      "Read(//d/Haku-Sci/tests/**)",
+      "Bash(node .claude/scripts/changeset.js*)",
+      "Bash(node D:/Haku-Sci/services/.claude/scripts/changeset.js*)",
+      "Read(//d/Haku-Sci/libs/**)",
+      "Read(//d/Haku-Sci/Gateway/**)",
+      "Read(~/.claude/CLAUDE.md)",
+      "Read(~/.claude/memory/**)",
+      "Read(//c/Users/NICOLA~1/AppData/Local/Temp/claude/**)",
+      "Read(//c/Users/Nicolas Blexmann/AppData/Local/Temp/claude/**)",
+      "Read(~/.claude/projects/**/tool-results/**)",
+      "Bash(date +%s)",
+      "Bash(npm run build*)",
+      "Bash(npm run test*)",
+      "Bash(npm run lint*)",
+      "Bash(npx tsc --noEmit*)",
+      "Bash(npx vitest*)",
+      "PowerShell(npm run build*)",
+      "PowerShell(npm run test*)",
+      "PowerShell(npx tsc --noEmit*)",
+      "Bash(graphify *)",
+      "PowerShell(graphify *)",
+      "Bash(docker ps*)",
+      "Bash(docker logs*)",
+      "PowerShell(docker ps*)",
+      "PowerShell(docker logs*)",
+      "PowerShell(Get-ChildItem*)",
+      "PowerShell(Get-Content*)",
+      "PowerShell(Test-Path*)",
+      "PowerShell(Get-Process*)",
+      "PowerShell(Invoke-RestMethod http://127.30.0.4:8500/v1/catalog/*)",
+      "PowerShell(Invoke-RestMethod https://api.haku-test.com/is-alive*)",
+      "PowerShell(Invoke-WebRequest https://collab.haku-test.com:4000/monitor*)",
+      "Bash(bash /d/Haku-Sci/.local-scripts/mcp-db.sh backup *)",
+      "mcp__neo4j__get_neo4j_schema",
+      "mcp__neo4j__read_neo4j_cypher",
+      "mcp__postgres__*",
+      "mcp__postgres-test__*",
+      "mcp__neo4j__write_neo4j_cypher",
+      "Bash(python D:/Haku-Sci/libs/local-tools/todo-agent/create-issue.py *)",
+      "Bash(node D:/Haku-Sci/services/.claude/hooks/record-review.js qa *)",
+      "Bash(node /d/Haku-Sci/services/.claude/scripts/changeset.js*)",
+      "Bash(node \"D:/Haku-Sci/services/.claude/scripts/changeset.js\"*)",
+      "Bash(node /d/Haku-Sci/services/.claude/scripts/stack.js*)",
+      "Bash(node \"D:/Haku-Sci/services/.claude/scripts/stack.js\"*)"
+    ],
+    "deny": [
+      "Bash(git add -A*)",
+      "Bash(git add .*)",
+      "Bash(git add --all*)",
+      "Bash(git -C * add -A*)",
+      "Bash(git -C * add .*)",
+      "Bash(git -C * add --all*)",
+      "Bash(git reset*)",
+      "Bash(git restore*)",
+      "Bash(git -C * reset*)",
+      "Bash(git -C * restore*)",
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(git -C * commit*)",
+      "Bash(git -C * push*)",
+      "PowerShell(git commit*)",
+      "PowerShell(git push*)",
+      "PowerShell(git -C * commit*)",
+      "PowerShell(git -C * push*)",
+      "Bash(npm publish*)",
+      "PowerShell(npm publish*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell",
+        "hooks": [
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect-files.js\"" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/track-edits.js\"" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-on-stop.js\"",
+            "timeout": 600,
+            "statusMessage": "Type-checking edited services..."
+          }
+        ]
+      }
+    ]
+  }
+}
