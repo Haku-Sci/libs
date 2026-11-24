@@ -1,0 +1,18 @@
+[Unit]
+Description=Haku-Sci todo agent (Claude Code Remote Control)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=haku-todo
+WorkingDirectory=/opt/haku-todo
+EnvironmentFile=/etc/haku-todo/env
+Environment=TERM=xterm-256color
+# `script` provides the pseudo-terminal that `claude remote-control` expects.
+ExecStart=/usr/bin/script -qfec "/var/lib/haku-todo/.local/bin/claude remote-control --name haku-todo --capacity 3 --permission-mode dontAsk" /dev/null
+# Server mode exits after ~10 minutes without network; restart brings the sessions back.
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

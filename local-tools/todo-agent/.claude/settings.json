@@ -1,0 +1,19 @@
+{
+  "model": "haiku",
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "allow": [
+      "Bash(python3 /opt/haku-todo/create-issue.py *)"
+    ],
+    "deny": [
+      "Edit",
+      "Write",
+      "NotebookEdit",
+      "WebFetch",
+      "WebSearch",
+      "Agent"
+    ],
+    "disableBypassPermissionsMode": "disable",
+    "disableAutoMode": "disable"
+  }
+}
